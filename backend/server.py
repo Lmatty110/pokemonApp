@@ -108,6 +108,17 @@ class QuizResult(BaseModel):
     profile_type: str
     description: str
 
+class PokemonAssign(BaseModel):
+    pokemon_id: int
+    pokemon_name: str
+
+class UserPokemon(BaseModel):
+    id: str
+    user_id: str
+    pokemon_id: int
+    pokemon_name: str
+    assigned_at: str
+
 # ============== HELPER FUNCTIONS ==============
 
 def hash_password(password: str) -> str:
