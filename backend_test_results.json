@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-02-08T11:42:08.711373",
+  "timestamp": "2026-02-08T12:21:01.219237",
   "base_url": "https://trainer-test.preview.emergentagent.com",
-  "total_tests": 16,
-  "passed_tests": 16,
+  "total_tests": 22,
+  "passed_tests": 22,
   "success_rate": 100.0,
   "test_details": [
     {
@@ -13,22 +13,32 @@
     {
       "test": "User Registration",
       "success": true,
-      "details": "User created: testuser_114201"
+      "details": "User created: testuser_122050"
     },
     {
       "test": "User Login",
       "success": true,
-      "details": "Login successful for: testuser_114201"
+      "details": "Login successful for: testuser_122050"
     },
     {
       "test": "Get User Profile",
       "success": true,
-      "details": "Profile retrieved: testuser_114201"
+      "details": "Profile retrieved: testuser_122050"
     },
     {
       "test": "Get News",
       "success": true,
-      "details": "Retrieved 1 news items, 1 questionnaire items"
+      "details": "Retrieved 2 news items, 1 questionnaire items"
+    },
+    {
+      "test": "News Detail",
+      "success": true,
+      "details": "Retrieved news: Questionario sulla Personalit\u00e0"
+    },
+    {
+      "test": "Get My Pokemon",
+      "success": true,
+      "details": "Retrieved 0 Pokemon"
     },
     {
       "test": "Quiz Submission",
@@ -53,12 +63,12 @@
     {
       "test": "Admin Get News",
       "success": true,
-      "details": "Retrieved 1 news items (admin view)"
+      "details": "Retrieved 2 news items (admin view)"
     },
     {
       "test": "Admin Create News",
       "success": true,
-      "details": "News created with ID: 26bf5bb7-5596-419e-84ca-b90f431918a6"
+      "details": "News created with ID: 2a0925df-843b-415d-96db-037d04a70b72"
     },
     {
       "test": "Admin Update News",
@@ -69,6 +79,26 @@
       "test": "Admin Delete News",
       "success": true,
       "details": "News deleted: News eliminata con successo"
+    },
+    {
+      "test": "Admin Get Users",
+      "success": true,
+      "details": "Retrieved 17 users"
+    },
+    {
+      "test": "Admin Assign Pokemon",
+      "success": true,
+      "details": "Assigned pikachu to user"
+    },
+    {
+      "test": "Admin Get User Pokemon",
+      "success": true,
+      "details": "User has 1 Pokemon assigned, including pikachu"
+    },
+    {
+      "test": "Admin Remove Pokemon",
+      "success": true,
+      "details": "Pokemon removed: Pokemon rimosso con successo"
     },
     {
       "test": "Invalid Login (Security)",
