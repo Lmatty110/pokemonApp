@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth, API } from "../App";
 import { Button } from "../components/ui/button";
@@ -12,9 +12,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { toast } from "sonner";
 import axios from "axios";
-import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star } from "lucide-react";
+import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2 } from "lucide-react";
 
 export default function DashboardPage() {
   const [news, setNews] = useState([]);
