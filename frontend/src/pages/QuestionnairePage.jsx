@@ -263,7 +263,7 @@ export default function QuestionnairePage() {
       </div>
 
       {/* Questionnaire Container */}
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="questionnaire-bg p-8 relative">
           {/* Pokeball Top */}
           <div className="absolute -top-8 left-1/2 -translate-x-1/2">
