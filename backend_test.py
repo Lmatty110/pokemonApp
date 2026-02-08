@@ -606,6 +606,8 @@ class PokemonAcademyAPITester:
         
         # Protected endpoints
         self.test_get_news()
+        self.test_news_detail()
+        self.test_get_my_pokemon()
         self.test_quiz_submission()
         self.test_quiz_history()
         
@@ -617,6 +619,13 @@ class PokemonAcademyAPITester:
         self.test_admin_create_news()
         self.test_admin_update_news()
         self.test_admin_delete_news()
+        
+        # Pokemon system tests
+        print("\n🎮 Testing Pokemon System...")
+        self.test_admin_get_users()
+        self.test_admin_assign_pokemon()
+        self.test_admin_get_user_pokemon()
+        self.test_admin_remove_pokemon()
         
         # Security tests
         print("\n🛡️ Testing Security...")
