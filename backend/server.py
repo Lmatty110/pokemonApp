@@ -33,6 +33,10 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'pokemon-academy-secret-key-2024')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
+# Admin credentials
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'aquilareale.mz@gmail.com')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Init1234')
+
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
