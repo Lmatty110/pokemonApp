@@ -103,20 +103,43 @@ export default function DashboardPage() {
             <h1 className="font-cinzel text-xl text-white">Accademia Pokémon</h1>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-white">
-              <User className="w-5 h-5 text-[#D4AF37]" />
-              <span className="font-lato text-sm hidden sm:inline">{user?.username}</span>
-            </div>
-            <Button
-              data-testid="logout-btn"
-              variant="ghost"
-              onClick={handleLogout}
-              className="text-white hover:text-[#D4AF37] hover:bg-transparent"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="ml-2 hidden sm:inline">Esci</span>
-            </Button>
+          <div className="flex items-center gap-4">
+            {/* Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button 
+                  data-testid="profile-dropdown-trigger"
+                  className="flex items-center gap-2 text-white hover:text-[#D4AF37] transition-colors px-3 py-2 rounded-lg hover:bg-white/10"
+                >
+                  <User className="w-5 h-5 text-[#D4AF37]" />
+                  <span className="font-lato text-sm hidden sm:inline">{user?.username}</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white border-[#D4AF37]">
+                <div className="px-3 py-2 border-b border-gray-100">
+                  <p className="font-cinzel text-sm text-[#2C3E50]">{user?.username}</p>
+                  <p className="font-lato text-xs text-gray-400">{user?.email}</p>
+                </div>
+                <DropdownMenuItem 
+                  data-testid="my-pokemon-menu-item"
+                  onClick={() => navigate("/my-pokemon")}
+                  className="cursor-pointer"
+                >
+                  <Gamepad2 className="w-4 h-4 mr-2 text-[#8E44AD]" />
+                  <span className="font-lato">Visualizza Pokémon Posseduti</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  data-testid="logout-menu-item"
+                  onClick={handleLogout}
+                  className="cursor-pointer text-red-500 focus:text-red-500"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  <span className="font-lato">Esci</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
