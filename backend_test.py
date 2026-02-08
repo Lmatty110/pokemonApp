@@ -413,6 +413,181 @@ class PokemonAcademyAPITester:
             self.log_test("Non-Admin Access Block (Security)", False, str(e))
             return False
 
+    def test_news_detail(self):
+        """Test getting news detail by ID"""
+        if not self.token:
+            self.log_test("News Detail", False, "No token available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        # First get news list to get a news ID
+        try:
+            response = requests.get(f"{self.api_url}/news", headers=headers)
+            if response.status_code != 200:
+                self.log_test("News Detail", False, "Failed to get news list")
+                return False
+            
+            news_list = response.json()
+            if not news_list:
+                self.log_test("News Detail", False, "No news available to test")
+                return False
+            
+            news_id = news_list[0]["id"]
+            
+            # Test news detail endpoint
+            response = requests.get(f"{self.api_url}/news/{news_id}", headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                success = data.get("id") == news_id
+                details = f"Retrieved news: {data.get('title', 'No title')}"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("News Detail", success, details)
+            return success
+        except Exception as e:
+            self.log_test("News Detail", False, str(e))
+            return False
+
+    def test_get_my_pokemon(self):
+        """Test getting user's assigned Pokemon"""
+        if not self.token:
+            self.log_test("Get My Pokemon", False, "No token available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        try:
+            response = requests.get(f"{self.api_url}/pokemon/my", headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"Retrieved {len(data)} Pokemon"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Get My Pokemon", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Get My Pokemon", False, str(e))
+            return False
+
+    def test_admin_get_users(self):
+        """Test admin getting all users"""
+        if not self.admin_token:
+            self.log_test("Admin Get Users", False, "No admin token available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        try:
+            response = requests.get(f"{self.api_url}/admin/users", headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                user_count = len(data)
+                details = f"Retrieved {user_count} users"
+                # Store test user ID for Pokemon tests
+                if self.user_data and user_count > 0:
+                    for user in data:
+                        if user.get("email") == self.user_data.get("email"):
+                            self.test_user_id = user.get("id")
+                            break
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Get Users", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Get Users", False, str(e))
+            return False
+
+    def test_admin_assign_pokemon(self):
+        """Test admin assigning Pokemon to user"""
+        if not self.admin_token or not self.test_user_id:
+            self.log_test("Admin Assign Pokemon", False, "No admin token or test user ID available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        pokemon_data = {
+            "pokemon_id": 25,  # Pikachu
+            "pokemon_name": "pikachu"
+        }
+        
+        try:
+            response = requests.post(f"{self.api_url}/admin/users/{self.test_user_id}/pokemon", 
+                                   json=pokemon_data, headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"Assigned {data.get('pokemon_name')} to user"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Assign Pokemon", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Assign Pokemon", False, str(e))
+            return False
+
+    def test_admin_get_user_pokemon(self):
+        """Test admin getting user's Pokemon"""
+        if not self.admin_token or not self.test_user_id:
+            self.log_test("Admin Get User Pokemon", False, "No admin token or test user ID available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        try:
+            response = requests.get(f"{self.api_url}/admin/users/{self.test_user_id}/pokemon", headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                pokemon_count = len(data)
+                details = f"User has {pokemon_count} Pokemon assigned"
+                if pokemon_count > 0:
+                    details += f", including {data[0].get('pokemon_name')}"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Get User Pokemon", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Get User Pokemon", False, str(e))
+            return False
+
+    def test_admin_remove_pokemon(self):
+        """Test admin removing Pokemon from user"""
+        if not self.admin_token or not self.test_user_id:
+            self.log_test("Admin Remove Pokemon", False, "No admin token or test user ID available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        try:
+            response = requests.delete(f"{self.api_url}/admin/users/{self.test_user_id}/pokemon/25", headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"Pokemon removed: {data.get('message')}"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Remove Pokemon", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Remove Pokemon", False, str(e))
+            return False
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pokémon Academy API Tests")
