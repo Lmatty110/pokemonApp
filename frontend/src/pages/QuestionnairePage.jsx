@@ -194,7 +194,7 @@ export default function QuestionnairePage() {
   if (result) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] py-8 px-4">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* Confirmation Card */}
           <div className="questionnaire-bg p-8 relative animate-fade-in">
             {/* Pokeball Top */}
@@ -236,13 +236,6 @@ export default function QuestionnairePage() {
                   <Home className="w-4 h-4 mr-2" />
                   Torna alla Bacheca
                 </Button>
-              </div>
-            </div>
-
-            {/* Masterball Bottom */}
-            <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
-              <div className="masterball">
-                <div className="center-button"></div>
               </div>
             </div>
           </div>
