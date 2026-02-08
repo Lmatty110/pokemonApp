@@ -504,6 +504,83 @@ async def get_quiz_history(current_user: dict = Depends(get_current_user)):
     ).to_list(100)
     return history
 
+# ============== NEWS DETAIL ROUTE ==============
+
+@api_router.get("/news/{news_id}")
+async def get_news_detail(news_id: str, current_user: dict = Depends(get_current_user)):
+    news = await db.news.find_one({"id": news_id, "is_active": True}, {"_id": 0})
+    if not news:
+        raise HTTPException(status_code=404, detail="News non trovata")
+    return news
+
+# ============== POKEMON ROUTES ==============
+
+@api_router.get("/pokemon/my")
+async def get_my_pokemon(current_user: dict = Depends(get_current_user)):
+    """Get all pokemon assigned to current user"""
+    pokemon = await db.user_pokemon.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).to_list(100)
+    return pokemon
+
+@api_router.get("/admin/users")
+async def get_all_users(admin: dict = Depends(get_admin_user)):
+    """Get all registered users for admin"""
+    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    return users
+
+@api_router.get("/admin/users/{user_id}/pokemon")
+async def get_user_pokemon_admin(user_id: str, admin: dict = Depends(get_admin_user)):
+    """Get pokemon assigned to a specific user"""
+    pokemon = await db.user_pokemon.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).to_list(100)
+    return pokemon
+
+@api_router.post("/admin/users/{user_id}/pokemon")
+async def assign_pokemon_to_user(user_id: str, pokemon_data: PokemonAssign, admin: dict = Depends(get_admin_user)):
+    """Assign a pokemon to a user"""
+    # Check if user exists
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    
+    # Check if pokemon already assigned
+    existing = await db.user_pokemon.find_one({
+        "user_id": user_id,
+        "pokemon_id": pokemon_data.pokemon_id
+    }, {"_id": 0})
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Pokemon già assegnato a questo utente")
+    
+    # Assign pokemon
+    pokemon_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "pokemon_id": pokemon_data.pokemon_id,
+        "pokemon_name": pokemon_data.pokemon_name,
+        "assigned_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.user_pokemon.insert_one(pokemon_doc)
+    return UserPokemon(**pokemon_doc)
+
+@api_router.delete("/admin/users/{user_id}/pokemon/{pokemon_id}")
+async def remove_pokemon_from_user(user_id: str, pokemon_id: int, admin: dict = Depends(get_admin_user)):
+    """Remove a pokemon from a user"""
+    result = await db.user_pokemon.delete_one({
+        "user_id": user_id,
+        "pokemon_id": pokemon_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Pokemon non trovato per questo utente")
+    
+    return {"message": "Pokemon rimosso con successo"}
+
 # ============== ROOT ROUTE ==============
 
 @api_router.get("/")
