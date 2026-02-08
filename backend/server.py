@@ -116,10 +116,11 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-def create_token(user_id: str) -> str:
+def create_token(user_id: str, is_admin: bool = False) -> str:
     expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
     payload = {
         "sub": user_id,
+        "is_admin": is_admin,
         "exp": expiration
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -129,13 +130,36 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         token = credentials.credentials
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
+        is_admin = payload.get("is_admin", False)
+        
         if not user_id:
             raise HTTPException(status_code=401, detail="Token non valido")
+        
+        # Check if it's admin token
+        if is_admin and user_id == "admin":
+            return {"id": "admin", "username": "Admin", "email": ADMIN_EMAIL, "is_admin": True, "created_at": datetime.now(timezone.utc).isoformat()}
         
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
         if not user:
             raise HTTPException(status_code=401, detail="Utente non trovato")
+        user["is_admin"] = False
         return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token scaduto")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token non valido")
+
+async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify user is admin"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        is_admin = payload.get("is_admin", False)
+        
+        if not is_admin:
+            raise HTTPException(status_code=403, detail="Accesso non autorizzato")
+        
+        return {"is_admin": True}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token scaduto")
     except jwt.InvalidTokenError:
