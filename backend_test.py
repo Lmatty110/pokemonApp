@@ -8,7 +8,9 @@ class PokemonAcademyAPITester:
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.token = None
+        self.admin_token = None
         self.user_data = None
+        self.created_news_id = None
         self.tests_run = 0
         self.tests_passed = 0
         self.test_results = []
