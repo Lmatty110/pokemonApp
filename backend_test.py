@@ -433,9 +433,20 @@ class PokemonAcademyAPITester:
         self.test_quiz_submission()
         self.test_quiz_history()
         
+        # Admin functionality tests
+        print("\n🔐 Testing Admin Functionality...")
+        self.test_admin_login()
+        self.test_admin_login_invalid()
+        self.test_admin_get_news()
+        self.test_admin_create_news()
+        self.test_admin_update_news()
+        self.test_admin_delete_news()
+        
         # Security tests
+        print("\n🛡️ Testing Security...")
         self.test_invalid_login()
         self.test_unauthorized_access()
+        self.test_non_admin_access_admin_endpoints()
         
         # Results
         print("=" * 50)
