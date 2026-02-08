@@ -73,7 +73,8 @@ export default function DashboardPage() {
     if (newsItem.news_type === "questionnaire") {
       setShowConfirmDialog(true);
     } else {
-      toast.info("Questa sezione sarà disponibile presto!");
+      // Navigate to news detail page
+      navigate(`/news/${newsItem.id}`);
     }
   };
 
