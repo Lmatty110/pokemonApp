@@ -194,7 +194,7 @@ export default function QuestionnairePage() {
   if (result) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] py-8 px-4">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           {/* Confirmation Card */}
           <div className="questionnaire-bg p-8 relative animate-fade-in">
             {/* Pokeball Top */}
