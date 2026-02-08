@@ -270,7 +270,7 @@ export default function QuestionnairePage() {
       </div>
 
       {/* Questionnaire Container */}
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="questionnaire-bg p-8 relative">
           {/* Pokeball Top */}
           <div className="absolute -top-8 left-1/2 -translate-x-1/2">
@@ -370,18 +370,11 @@ export default function QuestionnairePage() {
               </Button>
             )}
           </div>
-
-          {/* Masterball Bottom */}
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
-            <div className="masterball">
-              <div className="center-button"></div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Spacer for masterball */}
-      <div className="h-16"></div>
+      {/* Spacer */}
+      <div className="h-8"></div>
     </div>
   );
 }
