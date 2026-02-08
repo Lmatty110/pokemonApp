@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { toast } from "sonner";
 import axios from "axios";
-import { ArrowLeft, ArrowRight, Send, Home } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send, Home, CheckCircle } from "lucide-react";
 
 // Quiz questions data
 const questions = [
@@ -190,13 +190,13 @@ export default function QuestionnairePage() {
     return "acciaio";
   };
 
-  // Result Screen
+  // Result Screen - Now just shows confirmation, not the actual result
   if (result) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] py-8 px-4">
         <div className="max-w-2xl mx-auto">
-          {/* Result Card */}
-          <div className="parchment-container p-8 relative animate-fade-in">
+          {/* Confirmation Card */}
+          <div className="questionnaire-bg p-8 relative animate-fade-in">
             {/* Pokeball Top */}
             <div className="absolute -top-8 left-1/2 -translate-x-1/2">
               <div className="pokeball"></div>
@@ -204,38 +204,39 @@ export default function QuestionnairePage() {
 
             {/* Content */}
             <div className="pt-8 text-center">
-              <h2 className="font-courier text-sm text-gray-500 mb-2">
-                VALUTAZIONE DELLA COMMISSIONE
-              </h2>
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle className="w-10 h-10 text-green-600" />
+              </div>
+              
               <h1 
                 data-testid="result-title"
-                className="font-cinzel text-3xl text-[#2C3E50] mb-4"
+                className="font-cinzel text-2xl text-[#2C3E50] mb-4"
               >
-                {result.profile_name}
+                Questionario Completato!
               </h1>
               
-              <span className={`type-badge ${getTypeColor(result.profile_type)}`}>
-                {result.profile_type}
-              </span>
-
-              <div className="my-8 border-t-2 border-b-2 border-[#D4AF37] py-6">
-                <p className="font-lato text-lg text-[#2C3E50] italic">
-                  "{result.description}"
-                </p>
-              </div>
-
-              <p className="font-courier text-xs text-gray-400 mb-8">
-                I risultati sono stati inviati all'Accademia via email
+              <p className="font-lato text-[#2C3E50] mb-2">
+                Le tue risposte sono state registrate con successo.
+              </p>
+              
+              <p className="font-lato text-gray-600 mb-8">
+                I risultati della valutazione sono stati inviati all'Accademia e riceverai una comunicazione ufficiale via email.
               </p>
 
-              <Button
-                data-testid="back-to-dashboard-btn"
-                onClick={() => navigate("/dashboard")}
-                className="btn-academy"
-              >
-                <Home className="w-4 h-4 mr-2" />
-                Torna alla Bacheca
-              </Button>
+              <div className="border-t border-[#D4AF37]/30 pt-6">
+                <p className="font-courier text-xs text-gray-400 mb-6">
+                  Grazie per aver completato la valutazione della Commissione
+                </p>
+
+                <Button
+                  data-testid="back-to-dashboard-btn"
+                  onClick={() => navigate("/dashboard")}
+                  className="btn-academy"
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  Torna alla Bacheca
+                </Button>
+              </div>
             </div>
 
             {/* Masterball Bottom */}
@@ -270,7 +271,7 @@ export default function QuestionnairePage() {
 
       {/* Questionnaire Container */}
       <div className="max-w-3xl mx-auto">
-        <div className="parchment-container p-8 relative">
+        <div className="questionnaire-bg p-8 relative">
           {/* Pokeball Top */}
           <div className="absolute -top-8 left-1/2 -translate-x-1/2">
             <div className="pokeball"></div>
