@@ -6,7 +6,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { toast } from "sonner";
 import axios from "axios";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Shield } from "lucide-react";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -174,6 +174,19 @@ export default function AuthPage() {
                 className="font-cinzel text-[#C0392B] hover:text-[#D4AF37] transition-colors mt-1"
               >
                 {isLogin ? "Registrati" : "Accedi"}
+              </button>
+            </div>
+
+            {/* Admin Link */}
+            <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+              <button
+                data-testid="admin-login-link"
+                type="button"
+                onClick={() => navigate("/admin")}
+                className="flex items-center justify-center gap-2 mx-auto text-sm text-gray-400 hover:text-[#2C3E50] transition-colors"
+              >
+                <Shield className="w-4 h-4" />
+                <span className="font-lato">Accesso Admin</span>
               </button>
             </div>
           </div>
