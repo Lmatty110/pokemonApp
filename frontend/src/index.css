@@ -44,6 +44,16 @@ h1, h2, h3, h4, h5, h6 {
     background-blend-mode: multiply;
 }
 
+/* New questionnaire background with user's image */
+.questionnaire-bg {
+    background-color: #FDFBF7;
+    background-image: url('https://customer-assets.emergentagent.com/job_trainer-test/artifacts/05n618o7_sfondo%20questionario.png');
+    background-size: cover;
+    background-position: center;
+    border: 3px double #D4AF37;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 0 20px rgba(212, 175, 55, 0.1);
+}
+
 /* Pokeball CSS */
 .pokeball {
     width: 64px;
