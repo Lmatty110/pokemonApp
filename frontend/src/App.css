@@ -1,34 +1,89 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* App-specific styles */
+
+/* Hero section background */
+.hero-bg {
+    background-image: url('https://images.unsplash.com/photo-1764093488095-b96aa49b2e47?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxib29rc2hlbHZlcyUyMG9sZCUyMGxpYnJhcnklMjBkYXJrJTIwd29vZHxlbnwwfHx8fDE3NzA1NDc2NTJ8MA&ixlib=rb-4.1.0&q=85');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Parchment container for questionnaire */
+.parchment-container {
+    background-color: #FDFBF7;
+    background-image: url('https://images.unsplash.com/photo-1617565084998-13053b7d8510?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxwYXJjaG1lbnQlMjBwYXBlciUyMHRleHR1cmUlMjBvbGQlMjBwYXBlcnxlbnwwfHx8fDE3NzA1NDc1OTR8MA&ixlib=rb-4.1.0&q=85');
+    background-size: cover;
+    background-blend-mode: multiply;
+    border: 3px double #D4AF37;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 0 20px rgba(212, 175, 55, 0.1);
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Staggered animation delays */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+
+/* Profile type colors */
+.type-buio { color: #2C3E50; }
+.type-folletto { color: #E91E63; }
+.type-psico { color: #9C27B0; }
+.type-fuoco { color: #FF5722; }
+.type-normale { color: #9E9E9E; }
+.type-acciaio { color: #607D8B; }
+
+/* Badge styles for types */
+.type-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-.App-link {
-    color: #61dafb;
+.type-badge.buio { background: #2C3E50; color: white; }
+.type-badge.folletto { background: #E91E63; color: white; }
+.type-badge.psico { background: #9C27B0; color: white; }
+.type-badge.fuoco { background: linear-gradient(135deg, #FF5722, #FF9800); color: white; }
+.type-badge.normale { background: #9E9E9E; color: white; }
+.type-badge.acciaio { background: #607D8B; color: white; }
+
+/* Progress bar styling */
+.progress-bar {
+    height: 4px;
+    background: rgba(44, 62, 80, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.progress-bar .progress {
+    height: 100%;
+    background: linear-gradient(90deg, #D4AF37, #C0392B);
+    transition: width 0.3s ease;
+}
+
+/* Question card animations */
+.question-enter {
+    opacity: 0;
+    transform: translateX(50px);
+}
+
+.question-enter-active {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.question-exit {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.question-exit-active {
+    opacity: 0;
+    transform: translateX(-50px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
