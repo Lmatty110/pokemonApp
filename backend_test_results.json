@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-02-08T10:54:42.958364",
+  "base_url": "https://trainer-test.preview.emergentagent.com",
+  "total_tests": 9,
+  "passed_tests": 9,
+  "success_rate": 100.0,
+  "test_details": [
+    {
+      "test": "API Root",
+      "success": true,
+      "details": "Status: 200, Message: Pok\u00e9mon Academy API"
+    },
+    {
+      "test": "User Registration",
+      "success": true,
+      "details": "User created: testuser_105437"
+    },
+    {
+      "test": "User Login",
+      "success": true,
+      "details": "Login successful for: testuser_105437"
+    },
+    {
+      "test": "Get User Profile",
+      "success": true,
+      "details": "Profile retrieved: testuser_105437"
+    },
+    {
+      "test": "Get News",
+      "success": true,
+      "details": "Retrieved 1 news items, 1 questionnaire items"
+    },
+    {
+      "test": "Quiz Submission",
+      "success": true,
+      "details": "Quiz completed: Allenatore Cinico (Tipo Buio)"
+    },
+    {
+      "test": "Quiz History",
+      "success": true,
+      "details": "Retrieved 1 quiz history items"
+    },
+    {
+      "test": "Invalid Login (Security)",
+      "success": true,
+      "details": "Status: 401 (Expected 401)"
+    },
+    {
+      "test": "Unauthorized Access (Security)",
+      "success": true,
+      "details": "Status: 403 (Expected 403)"
+    }
+  ]
+}
