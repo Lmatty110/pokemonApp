@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-08T10:54:42.958364",
+  "timestamp": "2026-02-08T11:16:45.412966",
   "base_url": "https://trainer-test.preview.emergentagent.com",
   "total_tests": 9,
   "passed_tests": 9,
@@ -13,17 +13,17 @@
     {
       "test": "User Registration",
       "success": true,
-      "details": "User created: testuser_105437"
+      "details": "User created: testuser_111640"
     },
     {
       "test": "User Login",
       "success": true,
-      "details": "Login successful for: testuser_105437"
+      "details": "Login successful for: testuser_111640"
     },
     {
       "test": "Get User Profile",
       "success": true,
-      "details": "Profile retrieved: testuser_105437"
+      "details": "Profile retrieved: testuser_111640"
     },
     {
       "test": "Get News",
