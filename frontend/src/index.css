@@ -18,6 +18,38 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: var(--parchment-cream);
+    /* PWA optimizations */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+}
+
+/* Allow text selection in specific areas */
+input, textarea, .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* Safe area padding for notched phones */
+.safe-area-top {
+    padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Improve touch targets */
+button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Prevent pull-to-refresh on mobile */
+html {
+    overscroll-behavior: none;
 }
 
 h1, h2, h3, h4, h5, h6 {
