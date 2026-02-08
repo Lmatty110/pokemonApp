@@ -31,8 +31,8 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     logout();
-    navigate("/");
     toast.success("Arrivederci, allenatore!");
+    navigate("/");
   };
 
   const handleNewsClick = (newsItem) => {
