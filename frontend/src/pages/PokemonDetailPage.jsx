@@ -3,8 +3,20 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../App";
 import { toast } from "sonner";
 import axios from "axios";
-import { ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc, GraduationCap } from "lucide-react";
+import { ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc, GraduationCap, Info } from "lucide-react";
 import { Progress } from "../components/ui/progress";
+
+// Version groups in order from newest to oldest
+const VERSION_GROUPS = [
+  { name: "scarlet-violet", displayName: "Pokémon Scarlatto e Violetto" },
+  { name: "sword-shield", displayName: "Pokémon Spada e Scudo" },
+  { name: "ultra-sun-ultra-moon", displayName: "Pokémon Ultrasole e Ultraluna" },
+  { name: "sun-moon", displayName: "Pokémon Sole e Luna" },
+  { name: "omega-ruby-alpha-sapphire", displayName: "Pokémon Rubino Omega e Zaffiro Alpha" },
+  { name: "x-y", displayName: "Pokémon X e Y" },
+  { name: "black-2-white-2", displayName: "Pokémon Nero 2 e Bianco 2" },
+  { name: "black-white", displayName: "Pokémon Nero e Bianco" },
+];
 
 export default function PokemonDetailPage() {
   const [pokemon, setPokemon] = useState(null);
@@ -14,6 +26,7 @@ export default function PokemonDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("stats");
   const [movesSubTab, setMovesSubTab] = useState("level");
+  const [dataSource, setDataSource] = useState(null);
   const { pokemonId } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -32,104 +45,114 @@ export default function PokemonDetailPage() {
       const speciesRes = await axios.get(pokemonRes.data.species.url);
       setSpecies(speciesRes.data);
 
-      // Filter moves available in Scarlet/Violet (generation 9)
-      const svMoves = pokemonRes.data.moves.filter(move => 
-        move.version_group_details.some(vgd => 
-          vgd.version_group.name === "scarlet-violet"
-        )
-      );
+      // Try to find moves from available version groups
+      let foundMoves = false;
+      let usedVersionGroup = null;
 
-      // Separate level-up moves and TM moves
-      const levelUpMoves = [];
-      const machineMoves = [];
-
-      svMoves.forEach(move => {
-        const svDetails = move.version_group_details.find(vgd => 
-          vgd.version_group.name === "scarlet-violet"
+      for (const versionGroup of VERSION_GROUPS) {
+        const { levelUpMoves, machineMoves } = filterMovesByVersion(
+          pokemonRes.data.moves,
+          versionGroup.name
         );
-        
-        if (svDetails) {
-          if (svDetails.move_learn_method.name === "level-up") {
-            levelUpMoves.push({
-              ...move,
-              level: svDetails.level_learned_at
-            });
-          } else if (svDetails.move_learn_method.name === "machine") {
-            machineMoves.push(move);
-          }
+
+        if (levelUpMoves.length > 0 || machineMoves.length > 0) {
+          foundMoves = true;
+          usedVersionGroup = versionGroup;
+
+          // Sort level-up moves by level
+          levelUpMoves.sort((a, b) => a.level - b.level);
+
+          // Fetch move details for level-up moves
+          const levelMoveDetails = await fetchMoveDetails(levelUpMoves.slice(0, 50), true);
+          
+          // Fetch move details for TM moves
+          const tmMoveDetails = await fetchMoveDetails(machineMoves.slice(0, 60), false, versionGroup.name);
+
+          setLevelMoves(levelMoveDetails);
+          setTmMoves(tmMoveDetails);
+          setDataSource(versionGroup);
+          break;
         }
-      });
+      }
 
-      // Sort level-up moves by level
-      levelUpMoves.sort((a, b) => a.level - b.level);
-
-      // Fetch move details for level-up moves
-      const levelMoveDetails = await Promise.all(
-        levelUpMoves.slice(0, 40).map(async (move) => {
-          try {
-            const moveRes = await axios.get(move.move.url);
-            const italianName = moveRes.data.names.find(n => n.language.name === "it")?.name || moveRes.data.name;
-            return {
-              name: italianName,
-              englishName: moveRes.data.name,
-              type: moveRes.data.type.name,
-              power: moveRes.data.power,
-              accuracy: moveRes.data.accuracy,
-              pp: moveRes.data.pp,
-              damageClass: moveRes.data.damage_class.name,
-              level: move.level
-            };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      // Fetch move details for TM moves
-      const tmMoveDetails = await Promise.all(
-        machineMoves.slice(0, 50).map(async (move) => {
-          try {
-            const moveRes = await axios.get(move.move.url);
-            const italianName = moveRes.data.names.find(n => n.language.name === "it")?.name || moveRes.data.name;
-            
-            // Try to get TM number from machines
-            let tmNumber = null;
-            const svMachine = moveRes.data.machines.find(m => 
-              m.version_group.name === "scarlet-violet"
-            );
-            if (svMachine) {
-              try {
-                const machineRes = await axios.get(svMachine.machine.url);
-                const itemName = machineRes.data.item.name;
-                const match = itemName.match(/tm(\d+)/i);
-                if (match) tmNumber = match[1];
-              } catch {}
-            }
-
-            return {
-              name: italianName,
-              englishName: moveRes.data.name,
-              type: moveRes.data.type.name,
-              power: moveRes.data.power,
-              accuracy: moveRes.data.accuracy,
-              pp: moveRes.data.pp,
-              damageClass: moveRes.data.damage_class.name,
-              tmNumber: tmNumber
-            };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      setLevelMoves(levelMoveDetails.filter(m => m !== null));
-      setTmMoves(tmMoveDetails.filter(m => m !== null));
+      if (!foundMoves) {
+        setLevelMoves([]);
+        setTmMoves([]);
+        setDataSource(null);
+      }
     } catch (error) {
       toast.error("Errore nel caricamento del Pokemon");
       navigate("/my-pokemon");
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterMovesByVersion = (moves, versionGroupName) => {
+    const levelUpMoves = [];
+    const machineMoves = [];
+
+    moves.forEach(move => {
+      const versionDetails = move.version_group_details.find(vgd => 
+        vgd.version_group.name === versionGroupName
+      );
+      
+      if (versionDetails) {
+        if (versionDetails.move_learn_method.name === "level-up") {
+          levelUpMoves.push({
+            ...move,
+            level: versionDetails.level_learned_at
+          });
+        } else if (versionDetails.move_learn_method.name === "machine") {
+          machineMoves.push(move);
+        }
+      }
+    });
+
+    return { levelUpMoves, machineMoves };
+  };
+
+  const fetchMoveDetails = async (moves, isLevelUp, versionGroupName = null) => {
+    const moveDetails = await Promise.all(
+      moves.map(async (move) => {
+        try {
+          const moveRes = await axios.get(move.move.url);
+          const italianName = moveRes.data.names.find(n => n.language.name === "it")?.name || moveRes.data.name;
+          
+          let tmNumber = null;
+          if (!isLevelUp && versionGroupName) {
+            // Try to get TM number from machines
+            const versionMachine = moveRes.data.machines.find(m => 
+              m.version_group.name === versionGroupName
+            );
+            if (versionMachine) {
+              try {
+                const machineRes = await axios.get(versionMachine.machine.url);
+                const itemName = machineRes.data.item.name;
+                const match = itemName.match(/tm(\d+)/i);
+                if (match) tmNumber = match[1];
+              } catch {}
+            }
+          }
+
+          return {
+            name: italianName,
+            englishName: moveRes.data.name,
+            type: moveRes.data.type.name,
+            power: moveRes.data.power,
+            accuracy: moveRes.data.accuracy,
+            pp: moveRes.data.pp,
+            damageClass: moveRes.data.damage_class.name,
+            level: isLevelUp ? move.level : null,
+            tmNumber: tmNumber
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return moveDetails.filter(m => m !== null);
   };
 
   const getTypeColor = (type) => {
@@ -292,7 +315,7 @@ export default function PokemonDetailPage() {
                 : "text-gray-400 hover:text-gray-600"
             }`}
           >
-            Mosse (Scarlatto/Violetto)
+            Mosse
           </button>
         </div>
 
@@ -342,9 +365,25 @@ export default function PokemonDetailPage() {
             <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">
               Mosse Apprendibili
             </h2>
-            <p className="font-lato text-sm text-gray-500 mb-6">
-              Mosse disponibili in Pokémon Scarlatto e Violetto
-            </p>
+            
+            {/* Data Source Info */}
+            {dataSource && (
+              <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                <p className="font-lato text-sm text-blue-700">
+                  Dati recuperati da: <strong>{dataSource.displayName}</strong>
+                </p>
+              </div>
+            )}
+
+            {!dataSource && (levelMoves.length === 0 && tmMoves.length === 0) && (
+              <div className="flex items-center gap-2 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <Info className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                <p className="font-lato text-sm text-amber-700">
+                  Nessun dato disponibile per questo Pokémon nei giochi supportati.
+                </p>
+              </div>
+            )}
 
             {/* Moves Sub-tabs */}
             <div className="flex gap-2 mb-6">
@@ -502,7 +541,7 @@ export default function PokemonDetailPage() {
                   </div>
                 ) : (
                   <p className="text-center py-8 text-gray-500 font-lato">
-                    Nessuna mossa MT trovata per Scarlatto/Violetto
+                    Nessuna mossa MT trovata
                   </p>
                 )}
               </>
