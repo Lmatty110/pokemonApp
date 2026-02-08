@@ -10,6 +10,9 @@ import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import QuestionnairePage from "./pages/QuestionnairePage";
 import AdminPage from "./pages/AdminPage";
+import NewsDetailPage from "./pages/NewsDetailPage";
+import MyPokemonPage from "./pages/MyPokemonPage";
+import PokemonDetailPage from "./pages/PokemonDetailPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -118,6 +121,30 @@ function App() {
             }
           />
           <Route path="/admin" element={<AdminPage />} />
+          <Route
+            path="/news/:newsId"
+            element={
+              <ProtectedRoute>
+                <NewsDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-pokemon"
+            element={
+              <ProtectedRoute>
+                <MyPokemonPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pokemon/:pokemonId"
+            element={
+              <ProtectedRoute>
+                <PokemonDetailPage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
