@@ -69,11 +69,17 @@ class UserResponse(BaseModel):
     username: str
     email: str
     created_at: str
+    is_admin: bool = False
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+class AdminTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    is_admin: bool = True
 
 class NewsItem(BaseModel):
     id: str
