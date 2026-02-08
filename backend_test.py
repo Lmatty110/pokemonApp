@@ -238,6 +238,180 @@ class PokemonAcademyAPITester:
             self.log_test("Unauthorized Access (Security)", False, str(e))
             return False
 
+    def test_admin_login(self):
+        """Test admin login with correct credentials"""
+        admin_credentials = {
+            "email": "aquilareale.mz@gmail.com",
+            "password": "Init1234"
+        }
+        
+        try:
+            response = requests.post(f"{self.api_url}/admin/login", json=admin_credentials)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                self.admin_token = data.get("access_token")
+                is_admin = data.get("is_admin", False)
+                details = f"Admin login successful, is_admin: {is_admin}"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Login", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Login", False, str(e))
+            return False
+
+    def test_admin_login_invalid(self):
+        """Test admin login with invalid credentials"""
+        invalid_credentials = {
+            "email": "wrong@email.com",
+            "password": "wrongpassword"
+        }
+        
+        try:
+            response = requests.post(f"{self.api_url}/admin/login", json=invalid_credentials)
+            success = response.status_code == 401  # Should fail with 401
+            details = f"Status: {response.status_code} (Expected 401)"
+            
+            self.log_test("Admin Login Invalid (Security)", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Login Invalid (Security)", False, str(e))
+            return False
+
+    def test_admin_get_news(self):
+        """Test admin getting all news"""
+        if not self.admin_token:
+            self.log_test("Admin Get News", False, "No admin token available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        try:
+            response = requests.get(f"{self.api_url}/admin/news", headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                news_count = len(data)
+                details = f"Retrieved {news_count} news items (admin view)"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Get News", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Get News", False, str(e))
+            return False
+
+    def test_admin_create_news(self):
+        """Test admin creating news"""
+        if not self.admin_token:
+            self.log_test("Admin Create News", False, "No admin token available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        news_data = {
+            "title": "Test News Item",
+            "description": "This is a test news item created by admin",
+            "news_type": "announcement",
+            "size": "normal"
+        }
+        
+        try:
+            response = requests.post(f"{self.api_url}/admin/news", json=news_data, headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                self.created_news_id = data.get("id")
+                details = f"News created with ID: {self.created_news_id}"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Create News", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Create News", False, str(e))
+            return False
+
+    def test_admin_update_news(self):
+        """Test admin updating news"""
+        if not self.admin_token or not self.created_news_id:
+            self.log_test("Admin Update News", False, "No admin token or news ID available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        updated_data = {
+            "title": "Updated Test News Item",
+            "description": "This news item has been updated by admin",
+            "news_type": "event",
+            "size": "large"
+        }
+        
+        try:
+            response = requests.put(f"{self.api_url}/admin/news/{self.created_news_id}", json=updated_data, headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"News updated: {data.get('title')}"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Update News", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Update News", False, str(e))
+            return False
+
+    def test_admin_delete_news(self):
+        """Test admin deleting news"""
+        if not self.admin_token or not self.created_news_id:
+            self.log_test("Admin Delete News", False, "No admin token or news ID available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        try:
+            response = requests.delete(f"{self.api_url}/admin/news/{self.created_news_id}", headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"News deleted: {data.get('message')}"
+            else:
+                details = f"Status: {response.status_code}, Error: {response.text}"
+            
+            self.log_test("Admin Delete News", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Admin Delete News", False, str(e))
+            return False
+
+    def test_non_admin_access_admin_endpoints(self):
+        """Test regular user cannot access admin endpoints"""
+        if not self.token:
+            self.log_test("Non-Admin Access Block", False, "No user token available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        try:
+            response = requests.get(f"{self.api_url}/admin/news", headers=headers)
+            success = response.status_code == 403  # Should fail with 403
+            details = f"Status: {response.status_code} (Expected 403)"
+            
+            self.log_test("Non-Admin Access Block (Security)", success, details)
+            return success
+        except Exception as e:
+            self.log_test("Non-Admin Access Block (Security)", False, str(e))
+            return False
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pokémon Academy API Tests")
