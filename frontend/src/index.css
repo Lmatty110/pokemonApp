@@ -157,6 +157,20 @@ h1, h2, h3, h4, h5, h6 {
     transform: translateY(-4px);
 }
 
+/* Enhanced news card with gradient */
+.news-card-enhanced {
+    background: white;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.news-card-enhanced:hover {
+    border-color: var(--prestige-gold);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-6px);
+}
+
 /* Quiz option styling */
 .quiz-option {
     width: 100%;
