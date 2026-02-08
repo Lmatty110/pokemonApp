@@ -9,6 +9,7 @@ import HomePage from "./pages/HomePage";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import QuestionnairePage from "./pages/QuestionnairePage";
+import AdminPage from "./pages/AdminPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -116,6 +117,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
