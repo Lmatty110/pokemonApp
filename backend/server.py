@@ -348,8 +348,71 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         id=current_user["id"],
         username=current_user["username"],
         email=current_user["email"],
-        created_at=current_user["created_at"]
+        created_at=current_user["created_at"],
+        is_admin=current_user.get("is_admin", False)
     )
+
+# ============== ADMIN ROUTES ==============
+
+@api_router.post("/admin/login", response_model=AdminTokenResponse)
+async def admin_login(credentials: UserLogin):
+    """Admin login with hardcoded credentials"""
+    if credentials.email != ADMIN_EMAIL or credentials.password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Credenziali admin non valide")
+    
+    token = create_token("admin", is_admin=True)
+    
+    return AdminTokenResponse(
+        access_token=token,
+        is_admin=True
+    )
+
+@api_router.get("/admin/news", response_model=List[NewsItem])
+async def get_all_news_admin(admin: dict = Depends(get_admin_user)):
+    """Get all news including inactive ones for admin"""
+    news = await db.news.find({}, {"_id": 0}).to_list(100)
+    return news
+
+@api_router.post("/admin/news", response_model=NewsItem)
+async def create_news_admin(news_data: NewsCreate, admin: dict = Depends(get_admin_user)):
+    """Create news as admin"""
+    news_doc = {
+        "id": str(uuid.uuid4()),
+        "title": news_data.title,
+        "description": news_data.description,
+        "news_type": news_data.news_type,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "size": news_data.size
+    }
+    
+    await db.news.insert_one(news_doc)
+    return NewsItem(**news_doc)
+
+@api_router.delete("/admin/news/{news_id}")
+async def delete_news_admin(news_id: str, admin: dict = Depends(get_admin_user)):
+    """Delete news as admin"""
+    result = await db.news.delete_one({"id": news_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="News non trovata")
+    return {"message": "News eliminata con successo"}
+
+@api_router.put("/admin/news/{news_id}")
+async def update_news_admin(news_id: str, news_data: NewsCreate, admin: dict = Depends(get_admin_user)):
+    """Update news as admin"""
+    update_data = {
+        "title": news_data.title,
+        "description": news_data.description,
+        "news_type": news_data.news_type,
+        "size": news_data.size
+    }
+    
+    result = await db.news.update_one({"id": news_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="News non trovata")
+    
+    updated = await db.news.find_one({"id": news_id}, {"_id": 0})
+    return NewsItem(**updated)
 
 # ============== NEWS ROUTES ==============
 
