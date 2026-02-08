@@ -11,6 +11,7 @@ class PokemonAcademyAPITester:
         self.admin_token = None
         self.user_data = None
         self.created_news_id = None
+        self.test_user_id = None
         self.tests_run = 0
         self.tests_passed = 0
         self.test_results = []
