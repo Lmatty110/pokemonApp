@@ -64,14 +64,6 @@ const CustomStatsTable = ({ stats, typeColor }) => {
     return { tier: 3, label: "Molto Resistenti" };
   };
 
-  // Tier modifiers (for all stats except Speed)
-  const tierModifiers = {
-    0: { defense: "+10%", attack: "+0%", ps: 30 },
-    1: { defense: "+0%", attack: "+5%", ps: 60 },
-    2: { defense: "-10%", attack: "+10%", ps: 90 },
-    3: { defense: "-20%", attack: "+15%", ps: 120 },
-  };
-
   // Get stats values
   const getStatValue = (statName) => {
     const stat = stats.find(s => s.stat.name === statName);
@@ -101,13 +93,6 @@ const CustomStatsTable = ({ stats, typeColor }) => {
     return colors[tier] || colors[0];
   };
 
-  // Get modifier display
-  const getModifierDisplay = (value, isPositive) => {
-    if (value === "+0%" || value === "+0") return <Minus className="w-3 h-3 text-gray-400" />;
-    if (value.startsWith("+")) return <TrendingUp className="w-3 h-3 text-green-500" />;
-    return <TrendingDown className="w-3 h-3 text-red-500" />;
-  };
-
   const statRows = [
     { name: "PS", original: hp, classification: classifications.hp, statType: "hp" },
     { name: "Attacco", original: attack, classification: classifications.attack, statType: "attack" },
@@ -119,9 +104,9 @@ const CustomStatsTable = ({ stats, typeColor }) => {
 
   return (
     <div className="bg-white gold-border rounded-lg p-6">
-      <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">Classificazione Custom</h2>
+      <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">Statistiche Ufficiali</h2>
       <p className="font-lato text-sm text-gray-500 mb-6">
-        Sistema di valutazione personalizzato delle statistiche
+        Classificazione ufficiale dell'Accademia Pokémon
       </p>
 
       {/* Classification Table */}
@@ -129,32 +114,28 @@ const CustomStatsTable = ({ stats, typeColor }) => {
         <table className="w-full">
           <thead>
             <tr className="border-b-2 border-[#D4AF37]/30">
-              <th className="text-left py-3 px-2 font-cinzel text-sm text-[#2C3E50]">Statistica</th>
-              <th className="text-center py-3 px-2 font-cinzel text-sm text-[#2C3E50]">Valore</th>
-              <th className="text-center py-3 px-2 font-cinzel text-sm text-[#2C3E50]">Tier</th>
-              <th className="text-center py-3 px-2 font-cinzel text-sm text-[#2C3E50]">Classe</th>
-              <th className="text-center py-3 px-2 font-cinzel text-sm text-[#2C3E50]">Mod. Difesa</th>
-              <th className="text-center py-3 px-2 font-cinzel text-sm text-[#2C3E50]">Mod. Attacco</th>
-              <th className="text-center py-3 px-2 font-cinzel text-sm text-[#2C3E50]">PS Bonus</th>
+              <th className="text-left py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Statistica</th>
+              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Valore</th>
+              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Tier</th>
+              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Classe</th>
             </tr>
           </thead>
           <tbody>
             {statRows.map((row, index) => {
               const isSpeed = row.statType === "speed";
-              const modifier = !isSpeed ? tierModifiers[row.classification.tier] || tierModifiers[3] : null;
               
               return (
                 <tr 
                   key={row.statType}
                   className={`border-b border-gray-100 ${index % 2 === 0 ? 'bg-gray-50/50' : ''}`}
                 >
-                  <td className="py-3 px-2">
+                  <td className="py-3 px-4">
                     <span className="font-lato text-sm text-[#2C3E50]">{row.name}</span>
                   </td>
-                  <td className="py-3 px-2 text-center">
+                  <td className="py-3 px-4 text-center">
                     <span className="font-courier text-sm text-gray-600">{row.original}</span>
                   </td>
-                  <td className="py-3 px-2 text-center">
+                  <td className="py-3 px-4 text-center">
                     <span 
                       className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm"
                       style={{ backgroundColor: getTierColor(row.classification.tier, isSpeed ? 4 : 3) }}
@@ -162,7 +143,7 @@ const CustomStatsTable = ({ stats, typeColor }) => {
                       {row.classification.tier}
                     </span>
                   </td>
-                  <td className="py-3 px-2 text-center">
+                  <td className="py-3 px-4 text-center">
                     <span 
                       className="inline-block px-3 py-1 rounded-full text-xs font-medium text-white"
                       style={{ backgroundColor: getTierColor(row.classification.tier, isSpeed ? 4 : 3) }}
@@ -170,72 +151,11 @@ const CustomStatsTable = ({ stats, typeColor }) => {
                       {row.classification.label}
                     </span>
                   </td>
-                  <td className="py-3 px-2 text-center">
-                    {!isSpeed && modifier ? (
-                      <span className={`flex items-center justify-center gap-1 font-courier text-sm ${
-                        modifier.defense.startsWith('+') && modifier.defense !== '+0%' ? 'text-green-600' : 
-                        modifier.defense.startsWith('-') ? 'text-red-600' : 'text-gray-500'
-                      }`}>
-                        {getModifierDisplay(modifier.defense)}
-                        {modifier.defense}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 text-sm">—</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-2 text-center">
-                    {!isSpeed && modifier ? (
-                      <span className={`flex items-center justify-center gap-1 font-courier text-sm ${
-                        modifier.attack.startsWith('+') && modifier.attack !== '+0%' ? 'text-green-600' : 
-                        modifier.attack.startsWith('-') ? 'text-red-600' : 'text-gray-500'
-                      }`}>
-                        {getModifierDisplay(modifier.attack)}
-                        {modifier.attack}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 text-sm">—</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-2 text-center">
-                    {!isSpeed && modifier ? (
-                      <span className="font-courier text-sm text-[#8E44AD] font-bold">
-                        {modifier.ps}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 text-sm">—</span>
-                    )}
-                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
-
-      {/* Legend */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <h3 className="font-cinzel text-sm text-[#2C3E50] mb-3">Legenda Tier</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[#E74C3C] flex items-center justify-center text-white font-bold">0</span>
-            <span className="font-lato text-gray-600">Difese +10%, Attacchi +0%</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[#F39C12] flex items-center justify-center text-white font-bold">1</span>
-            <span className="font-lato text-gray-600">Difese +0%, Attacchi +5%</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[#3498DB] flex items-center justify-center text-white font-bold">2</span>
-            <span className="font-lato text-gray-600">Difese -10%, Attacchi +10%</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[#27AE60] flex items-center justify-center text-white font-bold">3</span>
-            <span className="font-lato text-gray-600">Difese -20%, Attacchi +15%</span>
-          </div>
-        </div>
-        <p className="font-lato text-xs text-gray-400 mt-3">
-          * La Velocità ha un tier aggiuntivo (4 = Molto Veloci) senza modificatori
-        </p>
       </div>
     </div>
   );
