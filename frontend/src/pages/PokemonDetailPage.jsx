@@ -321,41 +321,47 @@ export default function PokemonDetailPage() {
 
         {/* Stats Tab */}
         {activeTab === "stats" && (
-          <div className="bg-white gold-border rounded-lg p-6 mb-8 animate-fade-in">
-            <h2 className="font-cinzel text-xl text-[#2C3E50] mb-6">Statistiche Base</h2>
-            <div className="space-y-4">
-              {pokemon.stats.map((stat) => (
-                <div key={stat.stat.name} className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 w-32">
-                    <span style={{ color: getTypeColor(mainType) }}>
-                      {getStatIcon(stat.stat.name)}
-                    </span>
-                    <span className="font-lato text-sm text-[#2C3E50]">
-                      {getStatName(stat.stat.name)}
-                    </span>
+          <div className="space-y-6 mb-8 animate-fade-in">
+            {/* Base Stats */}
+            <div className="bg-white gold-border rounded-lg p-6">
+              <h2 className="font-cinzel text-xl text-[#2C3E50] mb-6">Statistiche Base</h2>
+              <div className="space-y-4">
+                {pokemon.stats.map((stat) => (
+                  <div key={stat.stat.name} className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 w-32">
+                      <span style={{ color: getTypeColor(mainType) }}>
+                        {getStatIcon(stat.stat.name)}
+                      </span>
+                      <span className="font-lato text-sm text-[#2C3E50]">
+                        {getStatName(stat.stat.name)}
+                      </span>
+                    </div>
+                    <span className="font-courier text-sm w-10 text-right">{stat.base_stat}</span>
+                    <div className="flex-1">
+                      <Progress 
+                        value={(stat.base_stat / 255) * 100} 
+                        className="h-3"
+                        style={{ 
+                          '--progress-background': getTypeColor(mainType)
+                        }}
+                      />
+                    </div>
                   </div>
-                  <span className="font-courier text-sm w-10 text-right">{stat.base_stat}</span>
-                  <div className="flex-1">
-                    <Progress 
-                      value={(stat.base_stat / 255) * 100} 
-                      className="h-3"
-                      style={{ 
-                        '--progress-background': getTypeColor(mainType)
-                      }}
-                    />
-                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-cinzel text-[#2C3E50]">Totale</span>
+                  <span className="font-courier text-lg text-[#D4AF37]">
+                    {pokemon.stats.reduce((sum, s) => sum + s.base_stat, 0)}
+                  </span>
                 </div>
-              ))}
-            </div>
-            
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="flex justify-between items-center">
-                <span className="font-cinzel text-[#2C3E50]">Totale</span>
-                <span className="font-courier text-lg text-[#D4AF37]">
-                  {pokemon.stats.reduce((sum, s) => sum + s.base_stat, 0)}
-                </span>
               </div>
             </div>
+
+            {/* Custom Classification Table */}
+            <CustomStatsTable stats={pokemon.stats} typeColor={getTypeColor(mainType)} />
           </div>
         )}
 
