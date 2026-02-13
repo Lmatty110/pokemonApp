@@ -737,6 +737,9 @@ export default function PokemonDetailPage() {
 
             {/* Custom Classification Table */}
             <CustomStatsTable stats={pokemon.stats} typeColor={getTypeColor(mainType)} />
+            
+            {/* Tier Legend */}
+            <TierLegend />
           </div>
         )}
 
