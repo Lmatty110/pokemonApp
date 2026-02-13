@@ -163,6 +163,69 @@ const CustomStatsTable = ({ stats, typeColor }) => {
   );
 };
 
+// Tier Legend Component
+const TierLegend = () => {
+  return (
+    <div className="bg-white gold-border rounded-lg p-6">
+      <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">Legenda Modificatori</h2>
+      <p className="font-lato text-sm text-gray-500 mb-6">
+        Bonus e malus applicati in base al Tier (tutte le stats tranne Velocità)
+      </p>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b-2 border-[#D4AF37]/30">
+              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Tier</th>
+              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Mod. Difese</th>
+              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Mod. Attacchi</th>
+              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">PS Bonus</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-gray-100 bg-gray-50/50">
+              <td className="py-3 px-4 text-center">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#E74C3C]">0</span>
+              </td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+10%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-gray-500">+0%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">30</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <td className="py-3 px-4 text-center">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#F39C12]">1</span>
+              </td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-gray-500">+0%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+5%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">60</td>
+            </tr>
+            <tr className="border-b border-gray-100 bg-gray-50/50">
+              <td className="py-3 px-4 text-center">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#3498DB]">2</span>
+              </td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-red-600">-10%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+10%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">90</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <td className="py-3 px-4 text-center">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#27AE60]">3</span>
+              </td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-red-600">-20%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+15%</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">120</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <p className="font-lato text-xs text-gray-400 mt-4">
+        * La Velocità (Tier 0-4) non ha modificatori percentuali
+      </p>
+    </div>
+  );
+};
+
 export default function PokemonDetailPage() {
   const [pokemon, setPokemon] = useState(null);
   const [species, setSpecies] = useState(null);
@@ -172,12 +235,19 @@ export default function PokemonDetailPage() {
   const [activeTab, setActiveTab] = useState("stats");
   const [movesSubTab, setMovesSubTab] = useState("level");
   const [dataSource, setDataSource] = useState(null);
+  const [userPokemonData, setUserPokemonData] = useState(null);
+  const [isEditingNickname, setIsEditingNickname] = useState(false);
+  const [isEditingLevel, setIsEditingLevel] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [level, setLevel] = useState("");
   const { pokemonId } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
 
   useEffect(() => {
     fetchPokemonData();
+    fetchUserPokemonData();
+  }, [pokemonId, token]);
   }, [pokemonId]);
 
   const fetchPokemonData = async () => {
