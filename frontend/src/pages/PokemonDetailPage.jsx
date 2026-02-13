@@ -248,7 +248,52 @@ export default function PokemonDetailPage() {
     fetchPokemonData();
     fetchUserPokemonData();
   }, [pokemonId, token]);
-  }, [pokemonId]);
+
+  const fetchUserPokemonData = async () => {
+    try {
+      const response = await axios.get(`${API}/pokemon/my/${pokemonId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUserPokemonData(response.data);
+      setNickname(response.data.nickname || "");
+      setLevel(response.data.level?.toString() || "");
+    } catch (error) {
+      console.log("Pokemon not assigned to user or error fetching data");
+    }
+  };
+
+  const saveNickname = async () => {
+    try {
+      await axios.put(`${API}/pokemon/my/${pokemonId}`, 
+        { nickname: nickname || null },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUserPokemonData(prev => ({ ...prev, nickname }));
+      setIsEditingNickname(false);
+      toast.success("Nickname salvato!");
+    } catch (error) {
+      toast.error("Errore nel salvataggio del nickname");
+    }
+  };
+
+  const saveLevel = async () => {
+    const levelNum = parseInt(level);
+    if (level && (isNaN(levelNum) || levelNum < 1 || levelNum > 100)) {
+      toast.error("Il livello deve essere tra 1 e 100");
+      return;
+    }
+    try {
+      await axios.put(`${API}/pokemon/my/${pokemonId}`, 
+        { level: level ? levelNum : null },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUserPokemonData(prev => ({ ...prev, level: levelNum }));
+      setIsEditingLevel(false);
+      toast.success("Livello salvato!");
+    } catch (error) {
+      toast.error("Errore nel salvataggio del livello");
+    }
+  };
 
   const fetchPokemonData = async () => {
     try {
