@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../App";
+import { useAuth, API } from "../App";
 import { toast } from "sonner";
 import axios from "axios";
-import { ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc, GraduationCap, Info } from "lucide-react";
+import { ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc, GraduationCap, Info, Edit2, Check, X } from "lucide-react";
 import { Progress } from "../components/ui/progress";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
 
 // Version groups in order from newest to oldest
 const VERSION_GROUPS = [
