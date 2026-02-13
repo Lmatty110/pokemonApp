@@ -530,6 +530,44 @@ async def get_my_pokemon(current_user: dict = Depends(get_current_user)):
     ).to_list(100)
     return pokemon
 
+@api_router.get("/pokemon/my/{pokemon_id}")
+async def get_my_pokemon_detail(pokemon_id: int, current_user: dict = Depends(get_current_user)):
+    """Get a specific pokemon assigned to current user"""
+    pokemon = await db.user_pokemon.find_one(
+        {"user_id": current_user["id"], "pokemon_id": pokemon_id},
+        {"_id": 0}
+    )
+    if not pokemon:
+        # Return default values if not found (for viewing any pokemon)
+        return {"pokemon_id": pokemon_id, "nickname": None, "level": None}
+    return pokemon
+
+@api_router.put("/pokemon/my/{pokemon_id}")
+async def update_my_pokemon(pokemon_id: int, update_data: PokemonUpdate, current_user: dict = Depends(get_current_user)):
+    """Update nickname and level for user's pokemon"""
+    update_fields = {}
+    if update_data.nickname is not None:
+        update_fields["nickname"] = update_data.nickname
+    if update_data.level is not None:
+        update_fields["level"] = update_data.level
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
+    
+    result = await db.user_pokemon.update_one(
+        {"user_id": current_user["id"], "pokemon_id": pokemon_id},
+        {"$set": update_fields}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pokemon non trovato")
+    
+    updated = await db.user_pokemon.find_one(
+        {"user_id": current_user["id"], "pokemon_id": pokemon_id},
+        {"_id": 0}
+    )
+    return updated
+
 @api_router.get("/admin/users")
 async def get_all_users(admin: dict = Depends(get_admin_user)):
     """Get all registered users for admin"""
