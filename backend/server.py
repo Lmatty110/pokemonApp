@@ -112,11 +112,17 @@ class PokemonAssign(BaseModel):
     pokemon_id: int
     pokemon_name: str
 
+class PokemonUpdate(BaseModel):
+    nickname: Optional[str] = None
+    level: Optional[int] = None
+
 class UserPokemon(BaseModel):
     id: str
     user_id: str
     pokemon_id: int
     pokemon_name: str
+    nickname: Optional[str] = None
+    level: Optional[int] = None
     assigned_at: str
 
 # ============== HELPER FUNCTIONS ==============
