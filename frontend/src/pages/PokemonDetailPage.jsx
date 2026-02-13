@@ -512,16 +512,74 @@ export default function PokemonDetailPage() {
             </div>
 
             {/* Pokemon Info */}
-            <div className="text-center sm:text-left">
+            <div className="text-center sm:text-left flex-1">
               <p className="font-courier text-gray-500 mb-1">
                 #{pokemon.id.toString().padStart(3, '0')}
               </p>
-              <h1 
-                data-testid="pokemon-name"
-                className="font-cinzel text-3xl sm:text-4xl text-[#2C3E50] capitalize mb-3"
-              >
-                {getItalianName()}
-              </h1>
+              
+              {/* Name and Nickname Section */}
+              <div className="mb-3">
+                <h1 
+                  data-testid="pokemon-name"
+                  className="font-cinzel text-3xl sm:text-4xl text-[#2C3E50] capitalize"
+                >
+                  {getItalianName()}
+                </h1>
+                
+                {/* Nickname Editor */}
+                {userPokemonData && (
+                  <div className="flex items-center gap-2 mt-2 justify-center sm:justify-start">
+                    {isEditingNickname ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          data-testid="nickname-input"
+                          value={nickname}
+                          onChange={(e) => setNickname(e.target.value)}
+                          placeholder="Inserisci nickname..."
+                          className="w-40 h-8 text-sm"
+                          maxLength={20}
+                        />
+                        <Button
+                          data-testid="save-nickname-btn"
+                          size="sm"
+                          variant="ghost"
+                          onClick={saveNickname}
+                          className="h-8 w-8 p-0 text-green-600 hover:bg-green-50"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          data-testid="cancel-nickname-btn"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setIsEditingNickname(false);
+                            setNickname(userPokemonData.nickname || "");
+                          }}
+                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="font-lato text-lg text-[#D4AF37] italic">
+                          {userPokemonData.nickname ? `"${userPokemonData.nickname}"` : "Nessun nickname"}
+                        </span>
+                        <Button
+                          data-testid="edit-nickname-btn"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setIsEditingNickname(true)}
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-[#D4AF37]"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {/* Types */}
               <div className="flex gap-2 justify-center sm:justify-start">
@@ -536,8 +594,8 @@ export default function PokemonDetailPage() {
                 ))}
               </div>
 
-              {/* Height/Weight */}
-              <div className="flex gap-6 mt-4 justify-center sm:justify-start">
+              {/* Height/Weight/Level */}
+              <div className="flex gap-6 mt-4 justify-center sm:justify-start flex-wrap">
                 <div>
                   <p className="font-courier text-xs text-gray-400">Altezza</p>
                   <p className="font-lato text-[#2C3E50]">{(pokemon.height / 10).toFixed(1)} m</p>
@@ -546,6 +604,63 @@ export default function PokemonDetailPage() {
                   <p className="font-courier text-xs text-gray-400">Peso</p>
                   <p className="font-lato text-[#2C3E50]">{(pokemon.weight / 10).toFixed(1)} kg</p>
                 </div>
+                
+                {/* Level Editor */}
+                {userPokemonData && (
+                  <div>
+                    <p className="font-courier text-xs text-gray-400">Livello</p>
+                    {isEditingLevel ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          data-testid="level-input"
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={level}
+                          onChange={(e) => setLevel(e.target.value)}
+                          placeholder="1-100"
+                          className="w-16 h-7 text-sm text-center"
+                        />
+                        <Button
+                          data-testid="save-level-btn"
+                          size="sm"
+                          variant="ghost"
+                          onClick={saveLevel}
+                          className="h-7 w-7 p-0 text-green-600 hover:bg-green-50"
+                        >
+                          <Check className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          data-testid="cancel-level-btn"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setIsEditingLevel(false);
+                            setLevel(userPokemonData.level?.toString() || "");
+                          }}
+                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="font-lato text-[#2C3E50]">
+                          {userPokemonData.level || "—"}
+                        </span>
+                        <Button
+                          data-testid="edit-level-btn"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setIsEditingLevel(true)}
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-[#D4AF37]"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
