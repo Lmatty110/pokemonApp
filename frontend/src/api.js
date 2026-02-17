@@ -1,17 +1,16 @@
 // src/api.js
 import axios from "axios";
-import { API } from "./App"; // oppure "./config" se preferisci
+import { API_BASE_URL } from "./config";
 
 const api = axios.create({
-  baseURL: API, // Usa l'URL centrale
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Optional: aggiungi interceptor per token o error handling
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token"); // esempio
+  const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
