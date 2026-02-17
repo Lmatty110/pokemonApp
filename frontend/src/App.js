@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useState, useEffect, createContext, useContext } from "react";
 import axios from "axios";
-import api from "../api";
+import api from "./api";
 
 // Pages
 import HomePage from "./pages/HomePage";
