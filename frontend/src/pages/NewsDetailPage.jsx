@@ -4,6 +4,7 @@ import { useAuth, API } from "../App";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 import axios from "axios";
+import api from "../api";
 import { ArrowLeft, Calendar, Bell, Scroll } from "lucide-react";
 
 export default function NewsDetailPage() {
@@ -19,7 +20,7 @@ export default function NewsDetailPage() {
 
   const fetchNews = async () => {
     try {
-      const response = await axios.get(`${API}/news/${newsId}`, {
+      const response = await api.get(`/news/${newsId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNews(response.data);

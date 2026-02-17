@@ -6,6 +6,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { toast } from "sonner";
 import axios from "axios";
+import api from "../api";
 import { ArrowLeft, Eye, EyeOff, Shield } from "lucide-react";
 
 export default function AuthPage() {
@@ -38,7 +39,7 @@ export default function AuthPage() {
         ? { email: formData.email, password: formData.password }
         : formData;
 
-      const response = await axios.post(`${API}${endpoint}`, payload);
+      const response = await api.post(`${endpoint}`, payload);
       
       login(response.data.access_token, response.data.user);
       toast.success(isLogin ? "Benvenuto nell'Accademia!" : "Registrazione completata!");

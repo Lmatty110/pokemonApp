@@ -29,6 +29,7 @@ import {
 } from "../components/ui/tabs";
 import { toast } from "sonner";
 import axios from "axios";
+import api from "../api";
 import { 
   ArrowLeft, 
   Plus, 
@@ -91,7 +92,7 @@ export default function AdminPage() {
 
   const validateToken = async () => {
     try {
-      const response = await axios.get(`${API}/admin/news`, {
+      const response = await api.get(`/admin/news`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNews(response.data);
@@ -109,7 +110,7 @@ export default function AdminPage() {
     setLoading(true);
     
     try {
-      const response = await axios.post(`${API}/admin/login`, loginForm);
+      const response = await api.post(`/admin/login`, loginForm);
       const newToken = response.data.access_token;
       localStorage.setItem("adminToken", newToken);
       setToken(newToken);
@@ -135,7 +136,7 @@ export default function AdminPage() {
 
   const fetchNews = async (authToken = token) => {
     try {
-      const response = await axios.get(`${API}/admin/news`, {
+      const response = await api.get(`/admin/news`, {
         headers: { Authorization: `Bearer ${authToken}` }
       });
       setNews(response.data);
@@ -146,7 +147,7 @@ export default function AdminPage() {
 
   const fetchUsers = async (authToken = token) => {
     try {
-      const response = await axios.get(`${API}/admin/users`, {
+      const response = await api.get(`/admin/users`, {
         headers: { Authorization: `Bearer ${authToken}` }
       });
       setUsers(response.data);
@@ -161,12 +162,12 @@ export default function AdminPage() {
     
     try {
       if (editingNews) {
-        await axios.put(`${API}/admin/news/${editingNews.id}`, newsForm, {
+        await api.put(`/admin/news/${editingNews.id}`, newsForm, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success("News aggiornata con successo!");
       } else {
-        await axios.post(`${API}/admin/news`, newsForm, {
+        await api.post(`/admin/news`, newsForm, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success("News creata con successo!");
@@ -201,7 +202,7 @@ export default function AdminPage() {
     if (!newsToDelete) return;
     
     try {
-      await axios.delete(`${API}/admin/news/${newsToDelete.id}`, {
+      await api.delete(`/admin/news/${newsToDelete.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success("News eliminata con successo!");
@@ -231,7 +232,7 @@ export default function AdminPage() {
   const selectUser = async (user) => {
     setSelectedUser(user);
     try {
-      const response = await axios.get(`${API}/admin/users/${user.id}/pokemon`, {
+      const response = await api.get(`/admin/users/${user.id}/pokemon`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUserPokemon(response.data);
@@ -270,7 +271,7 @@ export default function AdminPage() {
     if (!selectedUser) return;
     
     try {
-      await axios.post(`${API}/admin/users/${selectedUser.id}/pokemon`, {
+      await api.post(`/admin/users/${selectedUser.id}/pokemon`, {
         pokemon_id: pokemon.id,
         pokemon_name: pokemon.name
       }, {
@@ -281,7 +282,7 @@ export default function AdminPage() {
       setPokemonResults([]);
       
       // Refresh user pokemon
-      const response = await axios.get(`${API}/admin/users/${selectedUser.id}/pokemon`, {
+      const response = await api.get(`/admin/users/${selectedUser.id}/pokemon`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUserPokemon(response.data);
@@ -294,13 +295,13 @@ export default function AdminPage() {
     if (!selectedUser) return;
     
     try {
-      await axios.delete(`${API}/admin/users/${selectedUser.id}/pokemon/${pokemonId}`, {
+      await api.delete(`/admin/users/${selectedUser.id}/pokemon/${pokemonId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success("Pokemon rimosso con successo!");
       
       // Refresh user pokemon
-      const response = await axios.get(`${API}/admin/users/${selectedUser.id}/pokemon`, {
+      const response = await api.get(`/admin/users/${selectedUser.id}/pokemon`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUserPokemon(response.data);

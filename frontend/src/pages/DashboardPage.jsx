@@ -21,6 +21,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { toast } from "sonner";
 import axios from "axios";
+import api from "../api";
 import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -38,7 +39,7 @@ export default function DashboardPage() {
 
   const fetchNews = async () => {
     try {
-      const response = await axios.get(`${API}/news`, {
+      const response = await api.get(`/news`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNews(response.data);
@@ -51,7 +52,7 @@ export default function DashboardPage() {
 
   const fetchQuizHistory = async () => {
     try {
-      const response = await axios.get(`${API}/quiz/history`, {
+      const response = await api.get(`/quiz/history`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setQuizHistory(response.data);

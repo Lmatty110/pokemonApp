@@ -4,6 +4,7 @@ import { useAuth, API } from "../App";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 import axios from "axios";
+import api from "../api";
 import { ArrowLeft, Search } from "lucide-react";
 
 export default function MyPokemonPage() {
@@ -19,7 +20,7 @@ export default function MyPokemonPage() {
 
   const fetchMyPokemon = async () => {
     try {
-      const response = await axios.get(`${API}/pokemon/my`, {
+      const response = await api.get(`/pokemon/my`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPokemon(response.data);

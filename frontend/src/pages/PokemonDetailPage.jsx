@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth, API } from "../App";
 import { toast } from "sonner";
 import axios from "axios";
+import api from "../api";
 import { ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc, GraduationCap, Info, Edit2, Check, X } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { Input } from "../components/ui/input";
@@ -251,7 +252,7 @@ export default function PokemonDetailPage() {
 
   const fetchUserPokemonData = async () => {
     try {
-      const response = await axios.get(`${API}/pokemon/my/${pokemonId}`, {
+      const response = await api.get(`/pokemon/my/${pokemonId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUserPokemonData(response.data);
@@ -264,7 +265,7 @@ export default function PokemonDetailPage() {
 
   const saveNickname = async () => {
     try {
-      await axios.put(`${API}/pokemon/my/${pokemonId}`, 
+      await api.put(`/pokemon/my/${pokemonId}`, 
         { nickname: nickname || null },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -283,7 +284,7 @@ export default function PokemonDetailPage() {
       return;
     }
     try {
-      await axios.put(`${API}/pokemon/my/${pokemonId}`, 
+      await api.put(`/pokemon/my/${pokemonId}`, 
         { level: level ? levelNum : null },
         { headers: { Authorization: `Bearer ${token}` } }
       );

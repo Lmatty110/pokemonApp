@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { toast } from "sonner";
 import axios from "axios";
+import api from "../api";
 import { ArrowLeft, ArrowRight, Send, Home, CheckCircle } from "lucide-react";
 
 // Quiz questions data
@@ -165,8 +166,8 @@ export default function QuestionnairePage() {
         answer: answer
       }));
 
-      const response = await axios.post(
-        `${API}/quiz/submit`,
+      const response = await api.post(
+        `/quiz/submit`,
         { answers: formattedAnswers },
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useState, useEffect, createContext, useContext } from "react";
 import axios from "axios";
+import api from "../api";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -31,7 +32,7 @@ export const AuthProvider = ({ children }) => {
     const validateToken = async () => {
       if (token) {
         try {
-          const response = await axios.get(`${API}/auth/me`, {
+          const response = await api.get(`/auth/me`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           setUser(response.data);
