@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 import jwt
 from passlib.context import CryptContext
 import resend
+from passlib.context import CryptContext
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -38,7 +39,10 @@ ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'aquilareale.mz@gmail.com')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Init1234')
 
 # Password hashing
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+BCRYPT_MAX_BYTES = 72
 
 # Security
 security = HTTPBearer()
@@ -128,9 +132,20 @@ class UserPokemon(BaseModel):
 # ============== HELPER FUNCTIONS ==============
 
 def hash_password(password: str) -> str:
+    password_bytes = password.encode("utf-8")
+
+    if len(password_bytes) > BCRYPT_MAX_BYTES:
+        raise ValueError("Password too long (max 72 bytes for bcrypt)")
+
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    password_bytes = plain_password.encode("utf-8")
+
+    if len(password_bytes) > BCRYPT_MAX_BYTES:
+        return False  # evita crash su login
+
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_token(user_id: str, is_admin: bool = False) -> str:
