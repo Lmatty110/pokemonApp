@@ -131,6 +131,7 @@ class UserPokemon(BaseModel):
 
 # ============== HELPER FUNCTIONS ==============
 
+
 def hash_password(password: str) -> str:
     password_bytes = password.encode("utf-8")
 
