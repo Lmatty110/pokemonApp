@@ -634,13 +634,21 @@ async def root():
 # Include router
 app.include_router(api_router)
 
+origins_env = os.environ.get("CORS_ORIGINS")
+
+if origins_env:
+    origins = origins_env.split(",")
+else:
+    origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '').split(','),
+    allow_origins=origins,
+    allow_credentials=False,  # IMPORTANTISSIMO se usi "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
