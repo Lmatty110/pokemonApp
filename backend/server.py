@@ -27,7 +27,7 @@ db = client[os.environ['DB_NAME']]
 # Resend setup
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL', 'test@gmail.com')
+RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL', 'aquilareale.mz@gmail.com')
 
 # JWT settings
 JWT_SECRET = os.environ.get('JWT_SECRET', 'pokemon-academy-secret-key-2024')
