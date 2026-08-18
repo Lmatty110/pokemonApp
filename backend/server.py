@@ -116,9 +116,21 @@ class PokemonAssign(BaseModel):
     pokemon_id: int
     pokemon_name: str
 
+class LearnedMove(BaseModel):
+    name: str
+    englishName: str
+    type: str
+    power: Optional[int] = None
+    accuracy: Optional[int] = None
+    pp: Optional[int] = None
+    damageClass: str
+    level: Optional[int] = None
+    tmNumber: Optional[str] = None
+
 class PokemonUpdate(BaseModel):
     nickname: Optional[str] = None
     level: Optional[int] = None
+    learned_moves: Optional[List[Optional[LearnedMove]]] = None
 
 class UserPokemon(BaseModel):
     id: str
@@ -562,10 +574,24 @@ async def get_my_pokemon_detail(pokemon_id: int, current_user: dict = Depends(ge
 async def update_my_pokemon(pokemon_id: int, update_data: PokemonUpdate, current_user: dict = Depends(get_current_user)):
     """Update nickname and level for user's pokemon"""
     update_fields = {}
+
     if update_data.nickname is not None:
         update_fields["nickname"] = update_data.nickname
+
     if update_data.level is not None:
         update_fields["level"] = update_data.level
+
+    if update_data.learned_moves is not None:
+        # Manteniamo sempre esattamente 4 slot
+        learned_moves = list(update_data.learned_moves[:4])
+
+        while len(learned_moves) < 4:
+            learned_moves.append(None)
+
+        update_fields["learned_moves"] = [
+            move.model_dump() if move is not None else None
+            for move in learned_moves
+        ]
     
     if not update_fields:
         raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")

@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth, API } from "../App";
+import { useAuth } from "../App";
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
-import { ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc, GraduationCap, Info, Edit2, Check, X } from "lucide-react";
+import {
+  ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc,
+  GraduationCap, Info, Edit2, Check, X, Search, Save, Trash2
+} from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -21,9 +24,44 @@ const VERSION_GROUPS = [
   { name: "black-white", displayName: "Pokémon Nero e Bianco" },
 ];
 
-// Custom Stats Classification Component
-const CustomStatsTable = ({ stats, typeColor }) => {
-  // Classification functions
+const TYPE_COLORS = {
+  normal: "#A8A878", fire: "#F08030", water: "#6890F0", electric: "#F8D030",
+  grass: "#78C850", ice: "#98D8D8", fighting: "#C03028", poison: "#A040A0",
+  ground: "#E0C068", flying: "#A890F0", psychic: "#F85888", bug: "#A8B820",
+  rock: "#B8A038", ghost: "#705898", dragon: "#7038F8", dark: "#705848",
+  steel: "#B8B8D0", fairy: "#EE99AC"
+};
+
+const getTypeColor = (type) => TYPE_COLORS[type] || "#68A090";
+
+const getDamageClassLabel = (damageClass) => {
+  if (damageClass === "physical") return "Fisico";
+  if (damageClass === "special") return "Speciale";
+  return "Stato";
+};
+
+const getStatIcon = (stat) => {
+  switch (stat) {
+    case "hp": return <Heart className="w-4 h-4" />;
+    case "attack": return <Swords className="w-4 h-4" />;
+    case "defense": return <Shield className="w-4 h-4" />;
+    case "special-attack": return <Zap className="w-4 h-4" />;
+    case "special-defense": return <Target className="w-4 h-4" />;
+    case "speed": return <Wind className="w-4 h-4" />;
+    default: return null;
+  }
+};
+
+const getStatName = (stat) => ({
+  hp: "PS",
+  attack: "Attacco",
+  defense: "Difesa",
+  "special-attack": "Att. Speciale",
+  "special-defense": "Dif. Speciale",
+  speed: "Velocità"
+}[stat] || stat);
+
+const CustomStatsTable = ({ stats }) => {
   const classifySpeed = (value) => {
     if (value <= 39) return { tier: 0, label: "Molto Lenti" };
     if (value <= 69) return { tier: 1, label: "Lenti" };
@@ -46,13 +84,6 @@ const CustomStatsTable = ({ stats, typeColor }) => {
     return { tier: 3, label: "Molto Forti" };
   };
 
-  const classifySpecialAttack = (value) => {
-    if (value <= 64) return { tier: 0, label: "Deboli" };
-    if (value <= 94) return { tier: 1, label: "Medi" };
-    if (value <= 129) return { tier: 2, label: "Forti" };
-    return { tier: 3, label: "Molto Forti" };
-  };
-
   const classifySpecialDefense = (value) => {
     if (value <= 64) return { tier: 0, label: "Fragili" };
     if (value <= 94) return { tier: 1, label: "Medi" };
@@ -67,43 +98,18 @@ const CustomStatsTable = ({ stats, typeColor }) => {
     return { tier: 3, label: "Molto Resistenti" };
   };
 
-  // Get stats values
-  const getStatValue = (statName) => {
-    const stat = stats.find(s => s.stat.name === statName);
-    return stat ? stat.base_stat : 0;
-  };
+  const getValue = (name) => stats.find(s => s.stat.name === name)?.base_stat || 0;
 
-  const hp = getStatValue("hp");
-  const attack = getStatValue("attack");
-  const defense = getStatValue("defense");
-  const spAttack = getStatValue("special-attack");
-  const spDefense = getStatValue("special-defense");
-  const speed = getStatValue("speed");
-
-  // Classify all stats
-  const classifications = {
-    hp: classifyHP(hp),
-    attack: classifyAttack(attack),
-    defense: classifyDefense(defense),
-    spAttack: classifySpecialAttack(spAttack),
-    spDefense: classifySpecialDefense(spDefense),
-    speed: classifySpeed(speed),
-  };
-
-  // Get tier color
-  const getTierColor = (tier, maxTier = 3) => {
-    const colors = ["#E74C3C", "#F39C12", "#3498DB", "#27AE60", "#8E44AD"];
-    return colors[tier] || colors[0];
-  };
-
-  const statRows = [
-    { name: "PS", original: hp, classification: classifications.hp, statType: "hp" },
-    { name: "Attacco", original: attack, classification: classifications.attack, statType: "attack" },
-    { name: "Difesa", original: defense, classification: classifications.defense, statType: "defense" },
-    { name: "Att. Speciale", original: spAttack, classification: classifications.spAttack, statType: "spAttack" },
-    { name: "Dif. Speciale", original: spDefense, classification: classifications.spDefense, statType: "spDefense" },
-    { name: "Velocità", original: speed, classification: classifications.speed, statType: "speed" },
+  const rows = [
+    ["PS", getValue("hp"), classifyHP(getValue("hp")), false],
+    ["Attacco", getValue("attack"), classifyAttack(getValue("attack")), false],
+    ["Difesa", getValue("defense"), classifyDefense(getValue("defense")), false],
+    ["Att. Speciale", getValue("special-attack"), classifyAttack(getValue("special-attack")), false],
+    ["Dif. Speciale", getValue("special-defense"), classifySpecialDefense(getValue("special-defense")), false],
+    ["Velocità", getValue("speed"), classifySpeed(getValue("speed")), true],
   ];
+
+  const tierColors = ["#E74C3C", "#F39C12", "#3498DB", "#27AE60", "#8E44AD"];
 
   return (
     <div className="bg-white gold-border rounded-lg p-6">
@@ -111,8 +117,6 @@ const CustomStatsTable = ({ stats, typeColor }) => {
       <p className="font-lato text-sm text-gray-500 mb-6">
         Classificazione ufficiale dell'Accademia Pokémon
       </p>
-
-      {/* Classification Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -124,39 +128,28 @@ const CustomStatsTable = ({ stats, typeColor }) => {
             </tr>
           </thead>
           <tbody>
-            {statRows.map((row, index) => {
-              const isSpeed = row.statType === "speed";
-              
-              return (
-                <tr 
-                  key={row.statType}
-                  className={`border-b border-gray-100 ${index % 2 === 0 ? 'bg-gray-50/50' : ''}`}
-                >
-                  <td className="py-3 px-4">
-                    <span className="font-lato text-sm text-[#2C3E50]">{row.name}</span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span className="font-courier text-sm text-gray-600">{row.original}</span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span 
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm"
-                      style={{ backgroundColor: getTierColor(row.classification.tier, isSpeed ? 4 : 3) }}
-                    >
-                      {row.classification.tier}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span 
-                      className="inline-block px-3 py-1 rounded-full text-xs font-medium text-white"
-                      style={{ backgroundColor: getTierColor(row.classification.tier, isSpeed ? 4 : 3) }}
-                    >
-                      {row.classification.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
+            {rows.map(([name, value, classification, isSpeed], index) => (
+              <tr key={name} className={`border-b border-gray-100 ${index % 2 === 0 ? "bg-gray-50/50" : ""}`}>
+                <td className="py-3 px-4 font-lato text-sm text-[#2C3E50]">{name}</td>
+                <td className="py-3 px-4 text-center font-courier text-sm text-gray-600">{value}</td>
+                <td className="py-3 px-4 text-center">
+                  <span
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm"
+                    style={{ backgroundColor: tierColors[classification.tier] }}
+                  >
+                    {classification.tier}
+                  </span>
+                </td>
+                <td className="py-3 px-4 text-center">
+                  <span
+                    className="inline-block px-3 py-1 rounded-full text-xs font-medium text-white"
+                    style={{ backgroundColor: tierColors[classification.tier] }}
+                  >
+                    {classification.label}
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -164,65 +157,193 @@ const CustomStatsTable = ({ stats, typeColor }) => {
   );
 };
 
-// Tier Legend Component
-const TierLegend = () => {
+const TierLegend = () => (
+  <div className="bg-white gold-border rounded-lg p-6">
+    <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">Legenda Modificatori</h2>
+    <p className="font-lato text-sm text-gray-500 mb-6">
+      Bonus e malus applicati in base al Tier (tutte le stats tranne Velocità)
+    </p>
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b-2 border-[#D4AF37]/30">
+            <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Tier</th>
+            <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Mod. Difese</th>
+            <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Mod. Attacchi</th>
+            <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">PS Bonus</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ["0", "+10%", "+0%", "30"],
+            ["1", "+0%", "+5%", "60"],
+            ["2", "-10%", "+10%", "90"],
+            ["3", "-20%", "+15%", "120"]
+          ].map((row, index) => (
+            <tr key={row[0]} className={`border-b border-gray-100 ${index % 2 === 0 ? "bg-gray-50/50" : ""}`}>
+              <td className="py-3 px-4 text-center">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm"
+                  style={{ backgroundColor: ["#E74C3C", "#F39C12", "#3498DB", "#27AE60"][index] }}>
+                  {row[0]}
+                </span>
+              </td>
+              <td className="py-3 px-4 text-center font-courier text-sm">{row[1]}</td>
+              <td className="py-3 px-4 text-center font-courier text-sm">{row[2]}</td>
+              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">{row[3]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p className="font-lato text-xs text-gray-400 mt-4">
+      * La Velocità (Tier 0-4) non ha modificatori percentuali
+    </p>
+  </div>
+);
+
+// ============================================================
+// NUOVO PANNELLO: 4 MOSSE APPRESE
+// ============================================================
+const LearnedMovesPanel = ({
+  learnedMoves,
+  moveSearches,
+  setMoveSearches,
+  onSelectMove,
+  onRemoveMove,
+  onSave,
+  saving
+}) => {
+  const handleSearchChange = (index, value) => {
+    setMoveSearches(prev => ({ ...prev, [index]: value }));
+  };
+
   return (
-    <div className="bg-white gold-border rounded-lg p-6">
-      <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">Legenda Modificatori</h2>
-      <p className="font-lato text-sm text-gray-500 mb-6">
-        Bonus e malus applicati in base al Tier (tutte le stats tranne Velocità)
-      </p>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b-2 border-[#D4AF37]/30">
-              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Tier</th>
-              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Mod. Difese</th>
-              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Mod. Attacchi</th>
-              <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">PS Bonus</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-gray-100 bg-gray-50/50">
-              <td className="py-3 px-4 text-center">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#E74C3C]">0</span>
-              </td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+10%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-gray-500">+0%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">30</td>
-            </tr>
-            <tr className="border-b border-gray-100">
-              <td className="py-3 px-4 text-center">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#F39C12]">1</span>
-              </td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-gray-500">+0%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+5%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">60</td>
-            </tr>
-            <tr className="border-b border-gray-100 bg-gray-50/50">
-              <td className="py-3 px-4 text-center">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#3498DB]">2</span>
-              </td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-red-600">-10%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+10%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">90</td>
-            </tr>
-            <tr className="border-b border-gray-100">
-              <td className="py-3 px-4 text-center">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm bg-[#27AE60]">3</span>
-              </td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-red-600">-20%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-green-600">+15%</td>
-              <td className="py-3 px-4 text-center font-courier text-sm text-[#8E44AD] font-bold">120</td>
-            </tr>
-          </tbody>
-        </table>
+    <div className="bg-white gold-border rounded-lg p-6 mb-8 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+        <div>
+          <h2 className="font-cinzel text-xl text-[#2C3E50]">Mosse Apprese</h2>
+          <p className="font-lato text-sm text-gray-500 mt-1">
+            Seleziona fino a 4 mosse che il tuo Pokémon ha effettivamente appreso.
+          </p>
+        </div>
+        <Button
+          onClick={onSave}
+          disabled={saving}
+          className="bg-[#2C3E50] hover:bg-[#34495E] text-white"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          {saving ? "Salvataggio..." : "Salva mosse"}
+        </Button>
       </div>
-      
-      <p className="font-lato text-xs text-gray-400 mt-4">
-        * La Velocità (Tier 0-4) non ha modificatori percentuali
-      </p>
+
+      <div className="mt-6 space-y-4">
+        {learnedMoves.map((move, index) => {
+          const search = moveSearches[index] || "";
+          const isSearching = search.trim().length > 0 && !move;
+
+          return (
+            <div key={index} className="relative">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/40 flex items-center justify-center font-cinzel text-sm text-[#8E44AD]">
+                  {index + 1}
+                </div>
+
+                <div className="flex-1 relative">
+                  {move ? (
+                    <div className="flex items-center justify-between gap-3 p-3 border border-[#D4AF37] rounded-lg bg-[#FFFCF3]">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: getTypeColor(move.type) }}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-lato font-medium text-[#2C3E50] truncate">{move.name}</p>
+                          <p className="font-courier text-xs text-gray-400">
+                            {getDamageClassLabel(move.damageClass)}
+                            {move.power ? ` · Pot. ${move.power}` : ""}
+                            {move.tmNumber ? ` · MT${move.tmNumber}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRemoveMove(index)}
+                        className="text-red-500 hover:bg-red-50 flex-shrink-0"
+                        title="Rimuovi mossa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          value={search}
+                          onChange={(e) => handleSearchChange(index, e.target.value)}
+                          placeholder={`Cerca mossa per lo slot ${index + 1}...`}
+                          className="pl-9"
+                        />
+                      </div>
+                      {isSearching && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Usa i risultati che compariranno qui sotto.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {!move && search.trim() && moveSearches[index + "_results"]?.length > 0 && (
+                <div className="ml-12 mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-56 overflow-y-auto z-20 relative">
+                  {moveSearches[index + "_results"].map((candidate) => (
+                    <button
+                      key={`${index}-${candidate.englishName}`}
+                      type="button"
+                      onClick={() => onSelectMove(index, candidate)}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 border-b last:border-b-0 border-gray-100"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: getTypeColor(candidate.type) }}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-lato text-sm text-[#2C3E50] truncate">{candidate.name}</p>
+                          <p className="font-courier text-[10px] text-gray-400">
+                            {getDamageClassLabel(candidate.damageClass)}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-courier text-xs text-gray-400 flex-shrink-0">
+                        {candidate.tmNumber ? `MT${candidate.tmNumber}` : candidate.level != null ? `Lv. ${candidate.level}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!move && search.trim() && moveSearches[index + "_results"]?.length === 0 && (
+                <p className="ml-12 mt-2 text-sm text-gray-400">
+                  Nessuna mossa trovata tra quelle apprendibili da questo Pokémon.
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 p-3 rounded-lg bg-blue-50 border border-blue-200">
+        <div className="flex gap-2">
+          <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <p className="font-lato text-xs text-blue-700">
+            La ricerca utilizza le mosse disponibili nella scheda <strong>Mosse</strong>
+            {" "}del Pokémon, quindi non puoi assegnargli una mossa che non può apprendere.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
@@ -241,6 +362,12 @@ export default function PokemonDetailPage() {
   const [isEditingLevel, setIsEditingLevel] = useState(false);
   const [nickname, setNickname] = useState("");
   const [level, setLevel] = useState("");
+
+  // NUOVO: esattamente 4 slot
+  const [learnedMoves, setLearnedMoves] = useState([null, null, null, null]);
+  const [moveSearches, setMoveSearches] = useState({});
+  const [savingMoves, setSavingMoves] = useState(false);
+
   const { pokemonId } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -250,29 +377,38 @@ export default function PokemonDetailPage() {
     fetchUserPokemonData();
   }, [pokemonId, token]);
 
+  // Mantiene i 4 slot e carica ciò che è salvato nel backend.
+  const normalizeLearnedMoves = (moves) => {
+    const result = Array.isArray(moves) ? moves.slice(0, 4) : [];
+    while (result.length < 4) result.push(null);
+    return result;
+  };
+
   const fetchUserPokemonData = async () => {
     try {
       const response = await api.get(`/pokemon/my/${pokemonId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+
       setUserPokemonData(response.data);
       setNickname(response.data.nickname || "");
       setLevel(response.data.level?.toString() || "");
+      setLearnedMoves(normalizeLearnedMoves(response.data.learned_moves));
     } catch (error) {
-      console.log("Pokemon not assigned to user or error fetching data");
+      console.log("Pokemon non assegnato all'utente o errore nel caricamento dati");
     }
   };
 
   const saveNickname = async () => {
     try {
-      await api.put(`/pokemon/my/${pokemonId}`, 
+      await api.put(`/pokemon/my/${pokemonId}`,
         { nickname: nickname || null },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setUserPokemonData(prev => ({ ...prev, nickname }));
       setIsEditingNickname(false);
       toast.success("Nickname salvato!");
-    } catch (error) {
+    } catch {
       toast.error("Errore nel salvataggio del nickname");
     }
   };
@@ -283,32 +419,63 @@ export default function PokemonDetailPage() {
       toast.error("Il livello deve essere tra 1 e 100");
       return;
     }
+
     try {
-      await api.put(`/pokemon/my/${pokemonId}`, 
+      await api.put(`/pokemon/my/${pokemonId}`,
         { level: level ? levelNum : null },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setUserPokemonData(prev => ({ ...prev, level: levelNum }));
       setIsEditingLevel(false);
       toast.success("Livello salvato!");
-    } catch (error) {
+    } catch {
       toast.error("Errore nel salvataggio del livello");
+    }
+  };
+
+  const saveLearnedMoves = async () => {
+    if (!userPokemonData) {
+      toast.error("Questo Pokémon non è assegnato al tuo account");
+      return;
+    }
+
+    const selected = learnedMoves.filter(Boolean);
+
+    if (selected.length !== new Set(selected.map(move => move.englishName)).size) {
+      toast.error("Non puoi inserire la stessa mossa più volte");
+      return;
+    }
+
+    setSavingMoves(true);
+
+    try {
+      const response = await api.put(
+        `/pokemon/my/${pokemonId}`,
+        { learned_moves: learnedMoves },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setUserPokemonData(response.data);
+      setLearnedMoves(normalizeLearnedMoves(response.data.learned_moves));
+      setMoveSearches({});
+      toast.success("Mosse apprese salvate!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Errore nel salvataggio delle mosse apprese");
+    } finally {
+      setSavingMoves(false);
     }
   };
 
   const fetchPokemonData = async () => {
     try {
-      // Fetch Pokemon data from PokeAPI
       const pokemonRes = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
       setPokemon(pokemonRes.data);
 
-      // Fetch species for Italian name
       const speciesRes = await axios.get(pokemonRes.data.species.url);
       setSpecies(speciesRes.data);
 
-      // Try to find moves from available version groups
       let foundMoves = false;
-      let usedVersionGroup = null;
 
       for (const versionGroup of VERSION_GROUPS) {
         const { levelUpMoves, machineMoves } = filterMovesByVersion(
@@ -318,16 +485,19 @@ export default function PokemonDetailPage() {
 
         if (levelUpMoves.length > 0 || machineMoves.length > 0) {
           foundMoves = true;
-          usedVersionGroup = versionGroup;
 
-          // Sort level-up moves by level
           levelUpMoves.sort((a, b) => a.level - b.level);
 
-          // Fetch move details for level-up moves
-          const levelMoveDetails = await fetchMoveDetails(levelUpMoves.slice(0, 50), true);
-          
-          // Fetch move details for TM moves
-          const tmMoveDetails = await fetchMoveDetails(machineMoves.slice(0, 60), false, versionGroup.name);
+          const levelMoveDetails = await fetchMoveDetails(
+            levelUpMoves.slice(0, 50),
+            true
+          );
+
+          const tmMoveDetails = await fetchMoveDetails(
+            machineMoves.slice(0, 60),
+            false,
+            versionGroup.name
+          );
 
           setLevelMoves(levelMoveDetails);
           setTmMoves(tmMoveDetails);
@@ -342,6 +512,7 @@ export default function PokemonDetailPage() {
         setDataSource(null);
       }
     } catch (error) {
+      console.error(error);
       toast.error("Errore nel caricamento del Pokemon");
       navigate("/my-pokemon");
     } finally {
@@ -354,19 +525,19 @@ export default function PokemonDetailPage() {
     const machineMoves = [];
 
     moves.forEach(move => {
-      const versionDetails = move.version_group_details.find(vgd => 
-        vgd.version_group.name === versionGroupName
+      const versionDetails = move.version_group_details.find(
+        vgd => vgd.version_group.name === versionGroupName
       );
-      
-      if (versionDetails) {
-        if (versionDetails.move_learn_method.name === "level-up") {
-          levelUpMoves.push({
-            ...move,
-            level: versionDetails.level_learned_at
-          });
-        } else if (versionDetails.move_learn_method.name === "machine") {
-          machineMoves.push(move);
-        }
+
+      if (!versionDetails) return;
+
+      if (versionDetails.move_learn_method.name === "level-up") {
+        levelUpMoves.push({
+          ...move,
+          level: versionDetails.level_learned_at
+        });
+      } else if (versionDetails.move_learn_method.name === "machine") {
+        machineMoves.push(move);
       }
     });
 
@@ -378,21 +549,27 @@ export default function PokemonDetailPage() {
       moves.map(async (move) => {
         try {
           const moveRes = await axios.get(move.move.url);
-          const italianName = moveRes.data.names.find(n => n.language.name === "it")?.name || moveRes.data.name;
-          
+
+          const italianName =
+            moveRes.data.names.find(n => n.language.name === "it")?.name ||
+            moveRes.data.name;
+
           let tmNumber = null;
+
           if (!isLevelUp && versionGroupName) {
-            // Try to get TM number from machines
-            const versionMachine = moveRes.data.machines.find(m => 
-              m.version_group.name === versionGroupName
+            const versionMachine = moveRes.data.machines.find(
+              m => m.version_group.name === versionGroupName
             );
+
             if (versionMachine) {
               try {
                 const machineRes = await axios.get(versionMachine.machine.url);
                 const itemName = machineRes.data.item.name;
                 const match = itemName.match(/tm(\d+)/i);
                 if (match) tmNumber = match[1];
-              } catch {}
+              } catch {
+                // Il numero MT non è fondamentale per la ricerca.
+              }
             }
           }
 
@@ -405,7 +582,7 @@ export default function PokemonDetailPage() {
             pp: moveRes.data.pp,
             damageClass: moveRes.data.damage_class.name,
             level: isLevelUp ? move.level : null,
-            tmNumber: tmNumber
+            tmNumber
           };
         } catch {
           return null;
@@ -413,54 +590,96 @@ export default function PokemonDetailPage() {
       })
     );
 
-    return moveDetails.filter(m => m !== null);
+    return moveDetails.filter(Boolean);
   };
 
-  const getTypeColor = (type) => {
-    const colors = {
-      normal: "#A8A878", fire: "#F08030", water: "#6890F0", electric: "#F8D030",
-      grass: "#78C850", ice: "#98D8D8", fighting: "#C03028", poison: "#A040A0",
-      ground: "#E0C068", flying: "#A890F0", psychic: "#F85888", bug: "#A8B820",
-      rock: "#B8A038", ghost: "#705898", dragon: "#7038F8", dark: "#705848",
-      steel: "#B8B8D0", fairy: "#EE99AC"
-    };
-    return colors[type] || "#68A090";
-  };
+  // Unisce livello + MT e rimuove eventuali duplicati.
+  const allLearnableMoves = useMemo(() => {
+    const map = new Map();
 
-  const getStatIcon = (stat) => {
-    switch (stat) {
-      case "hp": return <Heart className="w-4 h-4" />;
-      case "attack": return <Swords className="w-4 h-4" />;
-      case "defense": return <Shield className="w-4 h-4" />;
-      case "special-attack": return <Zap className="w-4 h-4" />;
-      case "special-defense": return <Target className="w-4 h-4" />;
-      case "speed": return <Wind className="w-4 h-4" />;
-      default: return null;
+    [...levelMoves, ...tmMoves].forEach(move => {
+      if (!map.has(move.englishName)) {
+        map.set(move.englishName, move);
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, "it")
+    );
+  }, [levelMoves, tmMoves]);
+
+  // Aggiorna i risultati di ricerca di ogni slot.
+  useEffect(() => {
+    const nextSearches = { ...moveSearches };
+
+    for (let i = 0; i < 4; i++) {
+      const query = (moveSearches[i] || "").trim().toLowerCase();
+
+      if (!query) {
+        nextSearches[`${i}_results`] = [];
+        continue;
+      }
+
+      const alreadySelected = new Set(
+        learnedMoves.filter(Boolean).map(move => move.englishName)
+      );
+
+      // Non escludiamo la mossa selezionata nello stesso slot.
+      if (learnedMoves[i]) {
+        alreadySelected.delete(learnedMoves[i].englishName);
+      }
+
+      nextSearches[`${i}_results`] = allLearnableMoves
+        .filter(move => {
+          const matches =
+            move.name.toLowerCase().includes(query) ||
+            move.englishName.toLowerCase().includes(query);
+
+          return matches && !alreadySelected.has(move.englishName);
+        })
+        .slice(0, 10);
     }
+
+    setMoveSearches(nextSearches);
+  }, [allLearnableMoves, learnedMoves, moveSearches[0], moveSearches[1], moveSearches[2], moveSearches[3]]);
+
+  const selectLearnedMove = (index, move) => {
+    setLearnedMoves(prev => {
+      const next = [...prev];
+      next[index] = move;
+      return next;
+    });
+
+    setMoveSearches(prev => ({
+      ...prev,
+      [index]: "",
+      [`${index}_results`]: []
+    }));
   };
 
-  const getStatName = (stat) => {
-    const names = {
-      "hp": "PS",
-      "attack": "Attacco",
-      "defense": "Difesa",
-      "special-attack": "Att. Speciale",
-      "special-defense": "Dif. Speciale",
-      "speed": "Velocità"
-    };
-    return names[stat] || stat;
+  const removeLearnedMove = (index) => {
+    setLearnedMoves(prev => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+
+    setMoveSearches(prev => ({
+      ...prev,
+      [index]: "",
+      [`${index}_results`]: []
+    }));
   };
 
   const getItalianName = () => {
     if (!species) return pokemon?.name;
-    const italianName = species.names.find(n => n.language.name === "it");
-    return italianName?.name || pokemon?.name;
+    return species.names.find(n => n.language.name === "it")?.name || pokemon?.name;
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]">
-        <div className="animate-pulse">
+        <div className="animate-pulse text-center">
           <div className="pokeball mx-auto"></div>
           <p className="mt-4 font-cinzel text-[#2C3E50]">Caricamento...</p>
         </div>
@@ -474,10 +693,11 @@ export default function PokemonDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7]">
-      {/* Header with gradient based on Pokemon type */}
-      <header 
+      <header
         className="shadow-lg"
-        style={{ background: `linear-gradient(135deg, ${getTypeColor(mainType)}, ${getTypeColor(pokemon.types[1]?.type.name || mainType)})` }}
+        style={{
+          background: `linear-gradient(135deg, ${getTypeColor(mainType)}, ${getTypeColor(pokemon.types[1]?.type.name || mainType)})`
+        }}
       >
         <div className="max-w-7xl mx-auto px-4 py-4">
           <button
@@ -491,16 +711,14 @@ export default function PokemonDetailPage() {
         </div>
       </header>
 
-      {/* Pokemon Header */}
-      <div 
+      <div
         className="relative pb-8"
         style={{ background: `linear-gradient(180deg, ${getTypeColor(mainType)}40, transparent)` }}
       >
         <div className="max-w-4xl mx-auto px-4 pt-8">
           <div className="flex flex-col sm:flex-row items-center gap-6">
-            {/* Pokemon Image */}
             <div className="relative">
-              <div 
+              <div
                 className="w-48 h-48 rounded-full flex items-center justify-center"
                 style={{ background: `${getTypeColor(mainType)}30` }}
               >
@@ -512,22 +730,19 @@ export default function PokemonDetailPage() {
               </div>
             </div>
 
-            {/* Pokemon Info */}
             <div className="text-center sm:text-left flex-1">
               <p className="font-courier text-gray-500 mb-1">
-                #{pokemon.id.toString().padStart(3, '0')}
+                #{pokemon.id.toString().padStart(3, "0")}
               </p>
-              
-              {/* Name and Nickname Section */}
+
               <div className="mb-3">
-                <h1 
+                <h1
                   data-testid="pokemon-name"
                   className="font-cinzel text-3xl sm:text-4xl text-[#2C3E50] capitalize"
                 >
                   {getItalianName()}
                 </h1>
-                
-                {/* Nickname Editor */}
+
                 {userPokemonData && (
                   <div className="flex items-center gap-2 mt-2 justify-center sm:justify-start">
                     {isEditingNickname ? (
@@ -540,24 +755,17 @@ export default function PokemonDetailPage() {
                           className="w-40 h-8 text-sm"
                           maxLength={20}
                         />
-                        <Button
-                          data-testid="save-nickname-btn"
-                          size="sm"
-                          variant="ghost"
-                          onClick={saveNickname}
-                          className="h-8 w-8 p-0 text-green-600 hover:bg-green-50"
-                        >
+                        <Button size="sm" variant="ghost" onClick={saveNickname} className="h-8 w-8 p-0 text-green-600">
                           <Check className="w-4 h-4" />
                         </Button>
                         <Button
-                          data-testid="cancel-nickname-btn"
                           size="sm"
                           variant="ghost"
                           onClick={() => {
                             setIsEditingNickname(false);
                             setNickname(userPokemonData.nickname || "");
                           }}
-                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                          className="h-8 w-8 p-0 text-red-600"
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -567,13 +775,7 @@ export default function PokemonDetailPage() {
                         <span className="font-lato text-lg text-[#D4AF37] italic">
                           {userPokemonData.nickname ? `"${userPokemonData.nickname}"` : "Nessun nickname"}
                         </span>
-                        <Button
-                          data-testid="edit-nickname-btn"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setIsEditingNickname(true)}
-                          className="h-7 w-7 p-0 text-gray-400 hover:text-[#D4AF37]"
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => setIsEditingNickname(true)} className="h-7 w-7 p-0 text-gray-400">
                           <Edit2 className="w-3 h-3" />
                         </Button>
                       </div>
@@ -581,10 +783,9 @@ export default function PokemonDetailPage() {
                   </div>
                 )}
               </div>
-              
-              {/* Types */}
+
               <div className="flex gap-2 justify-center sm:justify-start">
-                {pokemon.types.map((t) => (
+                {pokemon.types.map(t => (
                   <span
                     key={t.type.name}
                     className="px-4 py-1 rounded-full text-white text-sm font-lato capitalize"
@@ -595,18 +796,17 @@ export default function PokemonDetailPage() {
                 ))}
               </div>
 
-              {/* Height/Weight/Level */}
               <div className="flex gap-6 mt-4 justify-center sm:justify-start flex-wrap">
                 <div>
                   <p className="font-courier text-xs text-gray-400">Altezza</p>
                   <p className="font-lato text-[#2C3E50]">{(pokemon.height / 10).toFixed(1)} m</p>
                 </div>
+
                 <div>
                   <p className="font-courier text-xs text-gray-400">Peso</p>
                   <p className="font-lato text-[#2C3E50]">{(pokemon.weight / 10).toFixed(1)} kg</p>
                 </div>
-                
-                {/* Level Editor */}
+
                 {userPokemonData && (
                   <div>
                     <p className="font-courier text-xs text-gray-400">Livello</p>
@@ -619,43 +819,27 @@ export default function PokemonDetailPage() {
                           max="100"
                           value={level}
                           onChange={(e) => setLevel(e.target.value)}
-                          placeholder="1-100"
                           className="w-16 h-7 text-sm text-center"
                         />
-                        <Button
-                          data-testid="save-level-btn"
-                          size="sm"
-                          variant="ghost"
-                          onClick={saveLevel}
-                          className="h-7 w-7 p-0 text-green-600 hover:bg-green-50"
-                        >
+                        <Button size="sm" variant="ghost" onClick={saveLevel} className="h-7 w-7 p-0 text-green-600">
                           <Check className="w-3 h-3" />
                         </Button>
                         <Button
-                          data-testid="cancel-level-btn"
                           size="sm"
                           variant="ghost"
                           onClick={() => {
                             setIsEditingLevel(false);
                             setLevel(userPokemonData.level?.toString() || "");
                           }}
-                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                          className="h-7 w-7 p-0 text-red-600"
                         >
                           <X className="w-3 h-3" />
                         </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
-                        <span className="font-lato text-[#2C3E50]">
-                          {userPokemonData.level || "—"}
-                        </span>
-                        <Button
-                          data-testid="edit-level-btn"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setIsEditingLevel(true)}
-                          className="h-6 w-6 p-0 text-gray-400 hover:text-[#D4AF37]"
-                        >
+                        <span className="font-lato text-[#2C3E50]">{userPokemonData.level || "—"}</span>
+                        <Button size="sm" variant="ghost" onClick={() => setIsEditingLevel(true)} className="h-6 w-6 p-0 text-gray-400">
                           <Edit2 className="w-3 h-3" />
                         </Button>
                       </div>
@@ -668,41 +852,52 @@ export default function PokemonDetailPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="max-w-4xl mx-auto px-4">
-        <div className="flex gap-4 border-b border-gray-200 mb-6">
+        {/* TAB PRINCIPALI: aggiunta Mosse Apprese */}
+        <div className="flex gap-2 sm:gap-4 border-b border-gray-200 mb-6 overflow-x-auto">
           <button
             data-testid="stats-tab"
             onClick={() => setActiveTab("stats")}
-            className={`pb-3 px-4 font-cinzel transition-colors ${
-              activeTab === "stats" 
-                ? "text-[#2C3E50] border-b-2 border-[#D4AF37]" 
+            className={`whitespace-nowrap pb-3 px-3 sm:px-4 font-cinzel transition-colors ${
+              activeTab === "stats"
+                ? "text-[#2C3E50] border-b-2 border-[#D4AF37]"
                 : "text-gray-400 hover:text-gray-600"
             }`}
           >
             Statistiche
           </button>
+
           <button
             data-testid="moves-tab"
             onClick={() => setActiveTab("moves")}
-            className={`pb-3 px-4 font-cinzel transition-colors ${
-              activeTab === "moves" 
-                ? "text-[#2C3E50] border-b-2 border-[#D4AF37]" 
+            className={`whitespace-nowrap pb-3 px-3 sm:px-4 font-cinzel transition-colors ${
+              activeTab === "moves"
+                ? "text-[#2C3E50] border-b-2 border-[#D4AF37]"
                 : "text-gray-400 hover:text-gray-600"
             }`}
           >
             Mosse
           </button>
+
+          <button
+            data-testid="learned-moves-tab"
+            onClick={() => setActiveTab("learnedMoves")}
+            className={`whitespace-nowrap pb-3 px-3 sm:px-4 font-cinzel transition-colors ${
+              activeTab === "learnedMoves"
+                ? "text-[#2C3E50] border-b-2 border-[#D4AF37]"
+                : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            Mosse Apprese
+          </button>
         </div>
 
-        {/* Stats Tab */}
         {activeTab === "stats" && (
           <div className="space-y-6 mb-8 animate-fade-in">
-            {/* Base Stats */}
             <div className="bg-white gold-border rounded-lg p-6">
               <h2 className="font-cinzel text-xl text-[#2C3E50] mb-6">Statistiche Base</h2>
               <div className="space-y-4">
-                {pokemon.stats.map((stat) => (
+                {pokemon.stats.map(stat => (
                   <div key={stat.stat.name} className="flex items-center gap-4">
                     <div className="flex items-center gap-2 w-32">
                       <span style={{ color: getTypeColor(mainType) }}>
@@ -714,44 +909,33 @@ export default function PokemonDetailPage() {
                     </div>
                     <span className="font-courier text-sm w-10 text-right">{stat.base_stat}</span>
                     <div className="flex-1">
-                      <Progress 
-                        value={(stat.base_stat / 255) * 100} 
+                      <Progress
+                        value={(stat.base_stat / 255) * 100}
                         className="h-3"
-                        style={{ 
-                          '--progress-background': getTypeColor(mainType)
-                        }}
+                        style={{ "--progress-background": getTypeColor(mainType) }}
                       />
                     </div>
                   </div>
                 ))}
               </div>
-              
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <div className="flex justify-between items-center">
-                  <span className="font-cinzel text-[#2C3E50]">Totale</span>
-                  <span className="font-courier text-lg text-[#D4AF37]">
-                    {pokemon.stats.reduce((sum, s) => sum + s.base_stat, 0)}
-                  </span>
-                </div>
+
+              <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
+                <span className="font-cinzel text-[#2C3E50]">Totale</span>
+                <span className="font-courier text-lg text-[#D4AF37]">
+                  {pokemon.stats.reduce((sum, s) => sum + s.base_stat, 0)}
+                </span>
               </div>
             </div>
 
-            {/* Custom Classification Table */}
-            <CustomStatsTable stats={pokemon.stats} typeColor={getTypeColor(mainType)} />
-            
-            {/* Tier Legend */}
+            <CustomStatsTable stats={pokemon.stats} />
             <TierLegend />
           </div>
         )}
 
-        {/* Moves Tab */}
         {activeTab === "moves" && (
           <div className="bg-white gold-border rounded-lg p-6 mb-8 animate-fade-in">
-            <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">
-              Mosse Apprendibili
-            </h2>
-            
-            {/* Data Source Info */}
+            <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">Mosse Apprendibili</h2>
+
             {dataSource && (
               <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <Info className="w-5 h-5 text-blue-500 flex-shrink-0" />
@@ -761,36 +945,23 @@ export default function PokemonDetailPage() {
               </div>
             )}
 
-            {!dataSource && (levelMoves.length === 0 && tmMoves.length === 0) && (
-              <div className="flex items-center gap-2 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <Info className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                <p className="font-lato text-sm text-amber-700">
-                  Nessun dato disponibile per questo Pokémon nei giochi supportati.
-                </p>
-              </div>
-            )}
-
-            {/* Moves Sub-tabs */}
             <div className="flex gap-2 mb-6">
               <button
                 data-testid="level-moves-tab"
                 onClick={() => setMovesSubTab("level")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-lato text-sm transition-colors ${
-                  movesSubTab === "level"
-                    ? "bg-[#2C3E50] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-lato text-sm ${
+                  movesSubTab === "level" ? "bg-[#2C3E50] text-white" : "bg-gray-100 text-gray-600"
                 }`}
               >
                 <GraduationCap className="w-4 h-4" />
                 Per Livello ({levelMoves.length})
               </button>
+
               <button
                 data-testid="tm-moves-tab"
                 onClick={() => setMovesSubTab("tm")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-lato text-sm transition-colors ${
-                  movesSubTab === "tm"
-                    ? "bg-[#8E44AD] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-lato text-sm ${
+                  movesSubTab === "tm" ? "bg-[#8E44AD] text-white" : "bg-gray-100 text-gray-600"
                 }`}
               >
                 <Disc className="w-4 h-4" />
@@ -798,140 +969,101 @@ export default function PokemonDetailPage() {
               </button>
             </div>
 
-            {/* Level-up Moves */}
             {movesSubTab === "level" && (
-              <>
-                {levelMoves.length > 0 ? (
-                  <div className="space-y-2">
-                    {/* Header */}
-                    <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-50 rounded-lg font-courier text-xs text-gray-500">
-                      <div className="col-span-2">LIV.</div>
-                      <div className="col-span-4">MOSSA</div>
-                      <div className="col-span-2">TIPO</div>
-                      <div className="col-span-2">POT.</div>
-                      <div className="col-span-2">PREC.</div>
-                    </div>
-                    
-                    {levelMoves.map((move, index) => (
-                      <div
-                        key={index}
-                        className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-gray-100 hover:border-[#D4AF37] transition-colors"
-                      >
-                        {/* Level */}
-                        <div className="col-span-2">
-                          <span className="inline-flex items-center justify-center w-10 h-8 bg-[#2C3E50] text-white rounded font-courier text-sm font-bold">
-                            {move.level === 0 ? "—" : move.level}
-                          </span>
-                        </div>
-                        
-                        {/* Move Name */}
-                        <div className="col-span-4">
-                          <p className="font-lato text-[#2C3E50] capitalize">{move.name}</p>
-                          <p className="font-courier text-xs text-gray-400 capitalize">
-                            {move.damageClass === "physical" ? "Fisico" : move.damageClass === "special" ? "Speciale" : "Stato"}
-                          </p>
-                        </div>
-                        
-                        {/* Type */}
-                        <div className="col-span-2">
-                          <span 
-                            className="inline-block w-3 h-3 rounded-full mr-1"
-                            style={{ backgroundColor: getTypeColor(move.type) }}
-                          ></span>
-                          <span className="font-lato text-xs text-gray-600 capitalize hidden sm:inline">{move.type}</span>
-                        </div>
-                        
-                        {/* Power */}
-                        <div className="col-span-2">
-                          <span className="font-courier text-sm text-[#C0392B]">
-                            {move.power || "—"}
-                          </span>
-                        </div>
-                        
-                        {/* Accuracy */}
-                        <div className="col-span-2">
-                          <span className="font-courier text-sm text-gray-500">
-                            {move.accuracy ? `${move.accuracy}%` : "—"}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+              levelMoves.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-50 rounded-lg font-courier text-xs text-gray-500">
+                    <div className="col-span-2">LIV.</div>
+                    <div className="col-span-4">MOSSA</div>
+                    <div className="col-span-2">TIPO</div>
+                    <div className="col-span-2">POT.</div>
+                    <div className="col-span-2">PREC.</div>
                   </div>
-                ) : (
-                  <p className="text-center py-8 text-gray-500 font-lato">
-                    Nessuna mossa per livello trovata
-                  </p>
-                )}
-              </>
+
+                  {levelMoves.map((move, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-gray-100 hover:border-[#D4AF37]">
+                      <div className="col-span-2">
+                        <span className="inline-flex items-center justify-center w-10 h-8 bg-[#2C3E50] text-white rounded font-courier text-sm font-bold">
+                          {move.level === 0 ? "—" : move.level}
+                        </span>
+                      </div>
+                      <div className="col-span-4">
+                        <p className="font-lato text-[#2C3E50]">{move.name}</p>
+                        <p className="font-courier text-xs text-gray-400">{getDamageClassLabel(move.damageClass)}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="inline-block w-3 h-3 rounded-full mr-1" style={{ backgroundColor: getTypeColor(move.type) }} />
+                        <span className="font-lato text-xs text-gray-600 hidden sm:inline capitalize">{move.type}</span>
+                      </div>
+                      <div className="col-span-2 font-courier text-sm text-[#C0392B]">{move.power || "—"}</div>
+                      <div className="col-span-2 font-courier text-sm text-gray-500">{move.accuracy ? `${move.accuracy}%` : "—"}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center py-8 text-gray-500 font-lato">Nessuna mossa per livello trovata</p>
+              )
             )}
 
-            {/* TM Moves */}
             {movesSubTab === "tm" && (
-              <>
-                {tmMoves.length > 0 ? (
-                  <div className="space-y-2">
-                    {/* Header */}
-                    <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-[#8E44AD]/10 rounded-lg font-courier text-xs text-gray-500">
-                      <div className="col-span-2">MT</div>
-                      <div className="col-span-4">MOSSA</div>
-                      <div className="col-span-2">TIPO</div>
-                      <div className="col-span-2">POT.</div>
-                      <div className="col-span-2">PREC.</div>
-                    </div>
-                    
-                    {tmMoves.map((move, index) => (
-                      <div
-                        key={index}
-                        className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-gray-100 hover:border-[#8E44AD] transition-colors"
-                      >
-                        {/* TM Number */}
-                        <div className="col-span-2">
-                          <span className="inline-flex items-center justify-center w-10 h-8 bg-[#8E44AD] text-white rounded font-courier text-xs font-bold">
-                            {move.tmNumber ? `${move.tmNumber}` : "MT"}
-                          </span>
-                        </div>
-                        
-                        {/* Move Name */}
-                        <div className="col-span-4">
-                          <p className="font-lato text-[#2C3E50] capitalize">{move.name}</p>
-                          <p className="font-courier text-xs text-gray-400 capitalize">
-                            {move.damageClass === "physical" ? "Fisico" : move.damageClass === "special" ? "Speciale" : "Stato"}
-                          </p>
-                        </div>
-                        
-                        {/* Type */}
-                        <div className="col-span-2">
-                          <span 
-                            className="inline-block w-3 h-3 rounded-full mr-1"
-                            style={{ backgroundColor: getTypeColor(move.type) }}
-                          ></span>
-                          <span className="font-lato text-xs text-gray-600 capitalize hidden sm:inline">{move.type}</span>
-                        </div>
-                        
-                        {/* Power */}
-                        <div className="col-span-2">
-                          <span className="font-courier text-sm text-[#C0392B]">
-                            {move.power || "—"}
-                          </span>
-                        </div>
-                        
-                        {/* Accuracy */}
-                        <div className="col-span-2">
-                          <span className="font-courier text-sm text-gray-500">
-                            {move.accuracy ? `${move.accuracy}%` : "—"}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+              tmMoves.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-[#8E44AD]/10 rounded-lg font-courier text-xs text-gray-500">
+                    <div className="col-span-2">MT</div>
+                    <div className="col-span-4">MOSSA</div>
+                    <div className="col-span-2">TIPO</div>
+                    <div className="col-span-2">POT.</div>
+                    <div className="col-span-2">PREC.</div>
                   </div>
-                ) : (
-                  <p className="text-center py-8 text-gray-500 font-lato">
-                    Nessuna mossa MT trovata
-                  </p>
-                )}
-              </>
+
+                  {tmMoves.map((move, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-gray-100 hover:border-[#8E44AD]">
+                      <div className="col-span-2">
+                        <span className="inline-flex items-center justify-center w-10 h-8 bg-[#8E44AD] text-white rounded font-courier text-xs font-bold">
+                          {move.tmNumber ? move.tmNumber : "MT"}
+                        </span>
+                      </div>
+                      <div className="col-span-4">
+                        <p className="font-lato text-[#2C3E50]">{move.name}</p>
+                        <p className="font-courier text-xs text-gray-400">{getDamageClassLabel(move.damageClass)}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="inline-block w-3 h-3 rounded-full mr-1" style={{ backgroundColor: getTypeColor(move.type) }} />
+                        <span className="font-lato text-xs text-gray-600 hidden sm:inline capitalize">{move.type}</span>
+                      </div>
+                      <div className="col-span-2 font-courier text-sm text-[#C0392B]">{move.power || "—"}</div>
+                      <div className="col-span-2 font-courier text-sm text-gray-500">{move.accuracy ? `${move.accuracy}%` : "—"}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center py-8 text-gray-500 font-lato">Nessuna mossa MT trovata</p>
+              )
             )}
           </div>
+        )}
+
+        {activeTab === "learnedMoves" && (
+          userPokemonData ? (
+            <LearnedMovesPanel
+              learnedMoves={learnedMoves}
+              moveSearches={moveSearches}
+              setMoveSearches={setMoveSearches}
+              onSelectMove={selectLearnedMove}
+              onRemoveMove={removeLearnedMove}
+              onSave={saveLearnedMoves}
+              saving={savingMoves}
+            />
+          ) : (
+            <div className="bg-white gold-border rounded-lg p-6 mb-8">
+              <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <Info className="w-5 h-5 text-amber-500" />
+                <p className="font-lato text-sm text-amber-700">
+                  Questo Pokémon non è assegnato al tuo account, quindi non puoi modificare le sue mosse apprese.
+                </p>
+              </div>
+            </div>
+          )
         )}
       </div>
     </div>
