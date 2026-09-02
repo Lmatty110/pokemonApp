@@ -6,7 +6,7 @@ import axios from "axios";
 import api from "../api";
 import {
   ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc,
-  GraduationCap, Info, Edit2, Check, X, Search, Save, Trash2
+  GraduationCap, Info, Edit2, Check, X, Search, Save, Trash2, Package
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { Input } from "../components/ui/input";
@@ -358,10 +358,11 @@ export default function PokemonDetailPage() {
   const [movesSubTab, setMovesSubTab] = useState("level");
   const [dataSource, setDataSource] = useState(null);
   const [userPokemonData, setUserPokemonData] = useState(null);
-  const [isEditingNickname, setIsEditingNickname] = useState(false);
   const [isEditingLevel, setIsEditingLevel] = useState(false);
-  const [nickname, setNickname] = useState("");
   const [level, setLevel] = useState("");
+  const [items, setItems] = useState([]);
+  const [selectedItemName, setSelectedItemName] = useState("");
+  const [savingItem, setSavingItem] = useState(false);
 
   // NUOVO: esattamente 4 slot
   const [learnedMoves, setLearnedMoves] = useState([null, null, null, null]);
@@ -375,7 +376,18 @@ export default function PokemonDetailPage() {
   useEffect(() => {
     fetchPokemonData();
     fetchUserPokemonData();
+    fetchItems();
   }, [pokemonId, token]);
+
+  const fetchItems = async () => {
+    try {
+      const response = await axios.get("https://pokeapi.co/api/v2/item?limit=3000");
+      setItems(response.data.results || []);
+    } catch (error) {
+      console.error(error);
+      toast.error("Errore nel caricamento degli strumenti");
+    }
+  };
 
   // Mantiene i 4 slot e carica ciò che è salvato nel backend.
   const normalizeLearnedMoves = (moves) => {
@@ -391,7 +403,7 @@ export default function PokemonDetailPage() {
       });
 
       setUserPokemonData(response.data);
-      setNickname(response.data.nickname || "");
+      setSelectedItemName(response.data.held_item?.name || "");
       setLevel(response.data.level?.toString() || "");
       setLearnedMoves(normalizeLearnedMoves(response.data.learned_moves));
     } catch (error) {
@@ -399,17 +411,34 @@ export default function PokemonDetailPage() {
     }
   };
 
-  const saveNickname = async () => {
+  const saveHeldItem = async () => {
+    setSavingItem(true);
     try {
-      await api.put(`/pokemon/my/${pokemonId}`,
-        { nickname: nickname || null },
+      let heldItem = null;
+      if (selectedItemName) {
+        const selected = items.find(item => item.name === selectedItemName);
+        if (!selected) throw new Error("Strumento non valido");
+        const itemResponse = await axios.get(selected.url);
+        const item = itemResponse.data;
+        heldItem = {
+          name: item.name,
+          display_name: item.names.find(entry => entry.language.name === "it")?.name
+            || item.names.find(entry => entry.language.name === "en")?.name
+            || item.name.replaceAll("-", " "),
+          sprite: item.sprites?.default || null
+        };
+      }
+      const response = await api.put(`/pokemon/my/${pokemonId}`,
+        { held_item: heldItem },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setUserPokemonData(prev => ({ ...prev, nickname }));
-      setIsEditingNickname(false);
-      toast.success("Nickname salvato!");
-    } catch {
-      toast.error("Errore nel salvataggio del nickname");
+      setUserPokemonData(response.data);
+      toast.success(heldItem ? "Strumento assegnato!" : "Strumento rimosso!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Errore nel salvataggio dello strumento");
+    } finally {
+      setSavingItem(false);
     }
   };
 
@@ -744,42 +773,37 @@ export default function PokemonDetailPage() {
                 </h1>
 
                 {userPokemonData && (
-                  <div className="flex items-center gap-2 mt-2 justify-center sm:justify-start">
-                    {isEditingNickname ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          data-testid="nickname-input"
-                          value={nickname}
-                          onChange={(e) => setNickname(e.target.value)}
-                          placeholder="Inserisci nickname..."
-                          className="w-40 h-8 text-sm"
-                          maxLength={20}
-                        />
-                        <Button size="sm" variant="ghost" onClick={saveNickname} className="h-8 w-8 p-0 text-green-600">
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setIsEditingNickname(false);
-                            setNickname(userPokemonData.nickname || "");
-                          }}
-                          className="h-8 w-8 p-0 text-red-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="font-lato text-lg text-[#D4AF37] italic">
-                          {userPokemonData.nickname ? `"${userPokemonData.nickname}"` : "Nessun nickname"}
-                        </span>
-                        <Button size="sm" variant="ghost" onClick={() => setIsEditingNickname(true)} className="h-7 w-7 p-0 text-gray-400">
-                          <Edit2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
+                  <div className="mt-3 flex flex-wrap items-end gap-2 justify-center sm:justify-start">
+                    <label className="text-left">
+                      <span className="block font-courier text-xs text-gray-400 mb-1">Strumento</span>
+                      <select
+                        data-testid="held-item-select"
+                        value={selectedItemName}
+                        onChange={(event) => setSelectedItemName(event.target.value)}
+                        className="w-52 h-9 px-2 bg-white border border-gray-200 rounded text-sm font-lato capitalize outline-none focus:border-[#D4AF37]"
+                      >
+                        <option value="">Nessuno strumento</option>
+                        {items.map(item => (
+                          <option key={item.name} value={item.name}>
+                            {item.name.replaceAll("-", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <Button
+                      data-testid="save-held-item"
+                      size="sm"
+                      onClick={saveHeldItem}
+                      disabled={savingItem || items.length === 0}
+                      className="h-9 bg-[#D4AF37] hover:bg-[#b8941f] text-white"
+                    >
+                      {savingItem ? "Salvataggio..." : (
+                        <>
+                          <Package className="w-4 h-4 mr-1" />
+                          Assegna
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
               </div>

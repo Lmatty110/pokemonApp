@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Package } from "lucide-react";
 
 export default function MyPokemonPage() {
   const [pokemon, setPokemon] = useState([]);
@@ -115,6 +115,23 @@ export default function MyPokemonPage() {
                       e.target.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png";
                     }}
                   />
+                  {p.held_item && (
+                    <div
+                      data-testid={`held-item-${index}`}
+                      title={`Strumento: ${p.held_item.display_name}`}
+                      className="absolute bottom-1 right-1 w-10 h-10 rounded-full bg-white border-2 border-[#D4AF37] shadow-md flex items-center justify-center"
+                    >
+                      {p.held_item.sprite ? (
+                        <img
+                          src={p.held_item.sprite}
+                          alt={p.held_item.display_name}
+                          className="w-8 h-8 object-contain"
+                        />
+                      ) : (
+                        <Package className="w-5 h-5 text-[#D4AF37]" />
+                      )}
+                    </div>
+                  )}
                 </div>
                 <p className="font-cinzel text-center text-[#2C3E50] mt-2 capitalize text-sm">
                   {p.pokemon_name}

@@ -127,10 +127,16 @@ class LearnedMove(BaseModel):
     level: Optional[int] = None
     tmNumber: Optional[str] = None
 
+class HeldItem(BaseModel):
+    name: str
+    display_name: str
+    sprite: Optional[str] = None
+
 class PokemonUpdate(BaseModel):
     nickname: Optional[str] = None
     level: Optional[int] = None
     learned_moves: Optional[List[Optional[LearnedMove]]] = None
+    held_item: Optional[HeldItem] = None
 
 class UserPokemon(BaseModel):
     id: str
@@ -139,6 +145,7 @@ class UserPokemon(BaseModel):
     pokemon_name: str
     nickname: Optional[str] = None
     level: Optional[int] = None
+    held_item: Optional[HeldItem] = None
     assigned_at: str
 
 # ============== HELPER FUNCTIONS ==============
@@ -592,6 +599,11 @@ async def update_my_pokemon(pokemon_id: int, update_data: PokemonUpdate, current
             move.model_dump() if move is not None else None
             for move in learned_moves
         ]
+
+    if "held_item" in update_data.model_fields_set:
+        update_fields["held_item"] = (
+            update_data.held_item.model_dump() if update_data.held_item else None
+        )
     
     if not update_fields:
         raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
