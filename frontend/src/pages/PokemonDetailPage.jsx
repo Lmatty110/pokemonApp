@@ -363,6 +363,10 @@ export default function PokemonDetailPage() {
   const [items, setItems] = useState([]);
   const [selectedItemName, setSelectedItemName] = useState("");
   const [savingItem, setSavingItem] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
+  const [isItemMenuOpen, setIsItemMenuOpen] = useState(false);
+  const [itemsLoading, setItemsLoading] = useState(true);
+  const [movesLoading, setMovesLoading] = useState(true);
 
   // NUOVO: esattamente 4 slot
   const [learnedMoves, setLearnedMoves] = useState([null, null, null, null]);
@@ -381,13 +385,77 @@ export default function PokemonDetailPage() {
 
   const fetchItems = async () => {
     try {
-      const response = await axios.get("https://pokeapi.co/api/v2/item?limit=3000");
-      setItems(response.data.results || []);
+      const cachedItems = sessionStorage.getItem("pokemon-held-items-it");
+      if (cachedItems) {
+        setItems(JSON.parse(cachedItems));
+        return;
+      }
+
+      // L'attributo 5 di PokéAPI contiene gli strumenti assegnabili.
+      const response = await axios.get("https://pokeapi.co/api/v2/item-attribute/5");
+      const itemResources = response.data.items || [];
+      const basicItems = itemResources.map(resource => ({
+        name: resource.name,
+        displayName: resource.name.replaceAll("-", " "),
+        sprite: null,
+        url: resource.url,
+        translated: false
+      }));
+      setItems(basicItems);
+      setItemsLoading(false);
+
+      let nextIndex = 0;
+      const translatedItems = [];
+
+      // Un piccolo pool evita centinaia di richieste simultanee.
+      const workers = Array.from({ length: 10 }, async () => {
+        while (nextIndex < itemResources.length) {
+          const resource = itemResources[nextIndex++];
+          try {
+            const detail = (await axios.get(resource.url)).data;
+            translatedItems.push({
+              name: detail.name,
+              displayName: detail.names.find(entry => entry.language.name === "it")?.name
+                || detail.names.find(entry => entry.language.name === "en")?.name
+                || detail.name.replaceAll("-", " "),
+              sprite: detail.sprites?.default || null,
+              url: resource.url,
+              translated: true
+            });
+          } catch {
+            translatedItems.push({
+              name: resource.name,
+              displayName: resource.name.replaceAll("-", " "),
+              sprite: null,
+              url: resource.url,
+              translated: false
+            });
+          }
+        }
+      });
+
+      await Promise.all(workers);
+      translatedItems.sort((a, b) => a.displayName.localeCompare(b.displayName, "it"));
+      setItems(translatedItems);
+      sessionStorage.setItem("pokemon-held-items-it", JSON.stringify(translatedItems));
     } catch (error) {
       console.error(error);
       toast.error("Errore nel caricamento degli strumenti");
+    } finally {
+      setItemsLoading(false);
     }
   };
+
+  const filteredItems = useMemo(() => {
+    const query = itemSearch.trim().toLocaleLowerCase("it");
+    if (!query) return items.slice(0, 12);
+    return items.filter(item =>
+      item.displayName.toLocaleLowerCase("it").includes(query)
+      || item.name.toLowerCase().includes(query)
+    ).slice(0, 12);
+  }, [items, itemSearch]);
+
+  const selectedItem = items.find(item => item.name === selectedItemName);
 
   // Mantiene i 4 slot e carica ciò che è salvato nel backend.
   const normalizeLearnedMoves = (moves) => {
@@ -404,6 +472,7 @@ export default function PokemonDetailPage() {
 
       setUserPokemonData(response.data);
       setSelectedItemName(response.data.held_item?.name || "");
+      setItemSearch(response.data.held_item?.display_name || "");
       setLevel(response.data.level?.toString() || "");
       setLearnedMoves(normalizeLearnedMoves(response.data.learned_moves));
     } catch (error) {
@@ -418,14 +487,21 @@ export default function PokemonDetailPage() {
       if (selectedItemName) {
         const selected = items.find(item => item.name === selectedItemName);
         if (!selected) throw new Error("Strumento non valido");
-        const itemResponse = await axios.get(selected.url);
-        const item = itemResponse.data;
+        let itemToSave = selected;
+        if (!selected.translated) {
+          const detail = (await axios.get(selected.url)).data;
+          itemToSave = {
+            ...selected,
+            displayName: detail.names.find(entry => entry.language.name === "it")?.name
+              || detail.names.find(entry => entry.language.name === "en")?.name
+              || detail.name.replaceAll("-", " "),
+            sprite: detail.sprites?.default || null
+          };
+        }
         heldItem = {
-          name: item.name,
-          display_name: item.names.find(entry => entry.language.name === "it")?.name
-            || item.names.find(entry => entry.language.name === "en")?.name
-            || item.name.replaceAll("-", " "),
-          sprite: item.sprites?.default || null
+          name: itemToSave.name,
+          display_name: itemToSave.displayName,
+          sprite: itemToSave.sprite
         };
       }
       const response = await api.put(`/pokemon/my/${pokemonId}`,
@@ -500,15 +576,26 @@ export default function PokemonDetailPage() {
     try {
       const pokemonRes = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
       setPokemon(pokemonRes.data);
+      setLoading(false);
+      void fetchSupportingPokemonData(pokemonRes.data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Errore nel caricamento del Pokemon");
+      navigate("/my-pokemon");
+      setLoading(false);
+    }
+  };
 
-      const speciesRes = await axios.get(pokemonRes.data.species.url);
+  const fetchSupportingPokemonData = async (pokemonData) => {
+    try {
+      const speciesRes = await axios.get(pokemonData.species.url);
       setSpecies(speciesRes.data);
 
       let foundMoves = false;
 
       for (const versionGroup of VERSION_GROUPS) {
         const { levelUpMoves, machineMoves } = filterMovesByVersion(
-          pokemonRes.data.moves,
+          pokemonData.moves,
           versionGroup.name
         );
 
@@ -517,16 +604,10 @@ export default function PokemonDetailPage() {
 
           levelUpMoves.sort((a, b) => a.level - b.level);
 
-          const levelMoveDetails = await fetchMoveDetails(
-            levelUpMoves.slice(0, 50),
-            true
-          );
-
-          const tmMoveDetails = await fetchMoveDetails(
-            machineMoves.slice(0, 60),
-            false,
-            versionGroup.name
-          );
+          const [levelMoveDetails, tmMoveDetails] = await Promise.all([
+            fetchMoveDetails(levelUpMoves.slice(0, 50), true),
+            fetchMoveDetails(machineMoves.slice(0, 60), false, versionGroup.name)
+          ]);
 
           setLevelMoves(levelMoveDetails);
           setTmMoves(tmMoveDetails);
@@ -542,10 +623,9 @@ export default function PokemonDetailPage() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Errore nel caricamento del Pokemon");
-      navigate("/my-pokemon");
+      toast.error("Alcuni dati aggiuntivi del Pokémon non sono disponibili");
     } finally {
-      setLoading(false);
+      setMovesLoading(false);
     }
   };
 
@@ -774,33 +854,95 @@ export default function PokemonDetailPage() {
 
                 {userPokemonData && (
                   <div className="mt-3 flex flex-wrap items-end gap-2 justify-center sm:justify-start">
-                    <label className="text-left">
+                    <div className="relative text-left">
                       <span className="block font-courier text-xs text-gray-400 mb-1">Strumento</span>
-                      <select
-                        data-testid="held-item-select"
-                        value={selectedItemName}
-                        onChange={(event) => setSelectedItemName(event.target.value)}
-                        className="w-52 h-9 px-2 bg-white border border-gray-200 rounded text-sm font-lato capitalize outline-none focus:border-[#D4AF37]"
-                      >
-                        <option value="">Nessuno strumento</option>
-                        {items.map(item => (
-                          <option key={item.name} value={item.name}>
-                            {item.name.replaceAll("-", " ")}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        <input
+                          data-testid="held-item-search"
+                          value={itemSearch}
+                          onChange={(event) => {
+                            setItemSearch(event.target.value);
+                            setSelectedItemName("");
+                            setIsItemMenuOpen(true);
+                          }}
+                          onFocus={() => setIsItemMenuOpen(true)}
+                          onBlur={() => setTimeout(() => setIsItemMenuOpen(false), 150)}
+                          placeholder={itemsLoading ? "Caricamento strumenti..." : "Cerca uno strumento..."}
+                          disabled={itemsLoading}
+                          autoComplete="off"
+                          className="w-64 h-10 pl-9 pr-9 bg-white border-2 border-[#D4AF37]/30 rounded-lg text-sm font-lato outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10 disabled:bg-gray-50"
+                        />
+                        {(itemSearch || selectedItemName) && (
+                          <button
+                            type="button"
+                            aria-label="Rimuovi strumento"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setItemSearch("");
+                              setSelectedItemName("");
+                              setIsItemMenuOpen(true);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-[#C0392B]"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {isItemMenuOpen && !itemsLoading && (
+                        <div className="absolute z-30 top-full left-0 mt-1 w-64 max-h-64 overflow-y-auto bg-white border border-[#D4AF37]/40 rounded-lg shadow-xl">
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setSelectedItemName("");
+                              setItemSearch("");
+                              setIsItemMenuOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm font-lato text-gray-500 hover:bg-[#D4AF37]/10 border-b border-gray-100"
+                          >
+                            Nessuno strumento
+                          </button>
+                          {filteredItems.map(item => (
+                            <button
+                              type="button"
+                              key={item.name}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => {
+                                setSelectedItemName(item.name);
+                                setItemSearch(item.displayName);
+                                setIsItemMenuOpen(false);
+                              }}
+                              className="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-[#D4AF37]/10"
+                            >
+                              {item.sprite ? (
+                                <img src={item.sprite} alt="" className="w-7 h-7 object-contain" />
+                              ) : (
+                                <Package className="w-5 h-5 mx-1 text-gray-400" />
+                              )}
+                              <span className="font-lato text-sm text-[#2C3E50]">{item.displayName}</span>
+                            </button>
+                          ))}
+                          {filteredItems.length === 0 && (
+                            <p className="px-3 py-4 text-center text-sm text-gray-500 font-lato">
+                              Nessuno strumento trovato
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <Button
                       data-testid="save-held-item"
                       size="sm"
                       onClick={saveHeldItem}
-                      disabled={savingItem || items.length === 0}
-                      className="h-9 bg-[#D4AF37] hover:bg-[#b8941f] text-white"
+                      disabled={savingItem || itemsLoading}
+                      className="h-10 bg-[#D4AF37] hover:bg-[#b8941f] text-white"
                     >
                       {savingItem ? "Salvataggio..." : (
                         <>
                           <Package className="w-4 h-4 mr-1" />
-                          Assegna
+                          {selectedItem ? "Assegna" : "Rimuovi"}
                         </>
                       )}
                     </Button>
@@ -960,6 +1102,13 @@ export default function PokemonDetailPage() {
           <div className="bg-white gold-border rounded-lg p-6 mb-8 animate-fade-in">
             <h2 className="font-cinzel text-xl text-[#2C3E50] mb-2">Mosse Apprendibili</h2>
 
+            {movesLoading && (
+              <div className="flex items-center gap-3 my-4 p-4 bg-gray-50 rounded-lg text-gray-500">
+                <div className="w-5 h-5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+                <p className="font-lato text-sm">Caricamento delle mosse in background...</p>
+              </div>
+            )}
+
             {dataSource && (
               <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <Info className="w-5 h-5 text-blue-500 flex-shrink-0" />
@@ -993,7 +1142,7 @@ export default function PokemonDetailPage() {
               </button>
             </div>
 
-            {movesSubTab === "level" && (
+            {!movesLoading && movesSubTab === "level" && (
               levelMoves.length > 0 ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-50 rounded-lg font-courier text-xs text-gray-500">
@@ -1029,7 +1178,7 @@ export default function PokemonDetailPage() {
               )
             )}
 
-            {movesSubTab === "tm" && (
+            {!movesLoading && movesSubTab === "tm" && (
               tmMoves.length > 0 ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-[#8E44AD]/10 rounded-lg font-courier text-xs text-gray-500">
