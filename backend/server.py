@@ -75,6 +75,19 @@ class UserResponse(BaseModel):
     created_at: str
     is_admin: bool = False
 
+class ProfileUpdate(BaseModel):
+    age: Optional[int] = Field(default=None, ge=0, le=120)
+    profile_image: Optional[str] = None
+    mind: str = Field(default="", max_length=500)
+    body: str = Field(default="", max_length=500)
+    space: str = Field(default="", max_length=500)
+    luck: str = Field(default="", max_length=500)
+
+class MedalAssign(BaseModel):
+    user_ids: List[str] = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=80)
+    image: str
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -404,6 +417,41 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         is_admin=current_user.get("is_admin", False)
     )
 
+# ============== PROFILE ROUTES ==============
+
+@api_router.get("/profile")
+async def get_profile(current_user: dict = Depends(get_current_user)):
+    profile = await db.user_profiles.find_one(
+        {"user_id": current_user["id"]}, {"_id": 0}
+    )
+    medals = await db.user_medals.find(
+        {"user_id": current_user["id"]}, {"_id": 0}
+    ).sort("assigned_at", 1).to_list(8)
+    return {
+        "username": current_user["username"],
+        "email": current_user["email"],
+        "age": profile.get("age") if profile else None,
+        "profile_image": profile.get("profile_image") if profile else None,
+        "mind": profile.get("mind", "") if profile else "",
+        "body": profile.get("body", "") if profile else "",
+        "space": profile.get("space", "") if profile else "",
+        "luck": profile.get("luck", "") if profile else "",
+        "medals": medals,
+    }
+
+@api_router.put("/profile")
+async def update_profile(profile_data: ProfileUpdate, current_user: dict = Depends(get_current_user)):
+    if profile_data.profile_image and len(profile_data.profile_image) > 3_000_000:
+        raise HTTPException(status_code=413, detail="Immagine profilo troppo grande")
+    values = profile_data.model_dump()
+    values["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.user_profiles.update_one(
+        {"user_id": current_user["id"]},
+        {"$set": values, "$setOnInsert": {"user_id": current_user["id"]}},
+        upsert=True,
+    )
+    return {"message": "Profilo aggiornato"}
+
 # ============== ADMIN ROUTES ==============
 
 @api_router.post("/admin/login", response_model=AdminTokenResponse)
@@ -627,6 +675,33 @@ async def get_all_users(admin: dict = Depends(get_admin_user)):
     """Get all registered users for admin"""
     users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
     return users
+
+@api_router.get("/admin/medals")
+async def get_medals_admin(admin: dict = Depends(get_admin_user)):
+    return await db.user_medals.find({}, {"_id": 0}).sort("assigned_at", -1).to_list(1000)
+
+@api_router.post("/admin/medals")
+async def assign_medal_admin(medal_data: MedalAssign, admin: dict = Depends(get_admin_user)):
+    if len(medal_data.image) > 3_000_000:
+        raise HTTPException(status_code=413, detail="Immagine medaglia troppo grande")
+    user_ids = list(dict.fromkeys(medal_data.user_ids))
+    existing_users = await db.users.count_documents({"id": {"$in": user_ids}})
+    if existing_users != len(user_ids):
+        raise HTTPException(status_code=404, detail="Uno o più allenatori non esistono")
+    full_users = []
+    for user_id in user_ids:
+        if await db.user_medals.count_documents({"user_id": user_id}) >= 8:
+            full_users.append(user_id)
+    if full_users:
+        raise HTTPException(status_code=400, detail="Uno o più allenatori hanno già 8 medaglie")
+    assigned_at = datetime.now(timezone.utc).isoformat()
+    documents = [{
+        "id": str(uuid.uuid4()), "user_id": user_id,
+        "name": medal_data.name.strip(), "image": medal_data.image,
+        "assigned_at": assigned_at,
+    } for user_id in user_ids]
+    await db.user_medals.insert_many(documents)
+    return {"assigned": len(documents)}
 
 @api_router.get("/admin/users/{user_id}/pokemon")
 async def get_user_pokemon_admin(user_id: str, admin: dict = Depends(get_admin_user)):

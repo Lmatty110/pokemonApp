@@ -45,7 +45,9 @@ import {
   Users,
   Search,
   X,
-  Gamepad2
+  Gamepad2,
+  Medal,
+  Upload
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -62,6 +64,8 @@ export default function AdminPage() {
   const [newsToDelete, setNewsToDelete] = useState(null);
   const [editingNews, setEditingNews] = useState(null);
   const [activeTab, setActiveTab] = useState("news");
+  const [selectedMedalUsers, setSelectedMedalUsers] = useState([]);
+  const [medalForm, setMedalForm] = useState({ name: "", image: "" });
   
   // Pokemon assignment states
   const [selectedUser, setSelectedUser] = useState(null);
@@ -314,6 +318,39 @@ export default function AdminPage() {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`;
   };
 
+  const toggleMedalUser = (userId) => {
+    setSelectedMedalUsers((current) => current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId]);
+  };
+
+  const handleMedalImage = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+      toast.error("Scegli un'immagine di massimo 2 MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setMedalForm((current) => ({ ...current, image: reader.result }));
+    reader.readAsDataURL(file);
+  };
+
+  const assignMedal = async (event) => {
+    event.preventDefault();
+    if (!selectedMedalUsers.length || !medalForm.name.trim() || !medalForm.image) {
+      toast.error("Inserisci nome, immagine e almeno un allenatore");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data } = await api.post("/admin/medals", { user_ids: selectedMedalUsers, ...medalForm }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success(`Medaglia assegnata a ${data.assigned} allenatori`);
+      setSelectedMedalUsers([]);
+      setMedalForm({ name: "", image: "" });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Errore durante l'assegnazione");
+    } finally { setLoading(false); }
+  };
+
   // Login Screen
   if (!isLoggedIn) {
     return (
@@ -433,7 +470,7 @@ export default function AdminPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-8">
+          <TabsList className="grid w-full max-w-2xl grid-cols-3 mb-8">
             <TabsTrigger value="news" className="font-cinzel">
               <Bell className="w-4 h-4 mr-2" />
               Gestione News
@@ -441,6 +478,10 @@ export default function AdminPage() {
             <TabsTrigger value="pokemon" className="font-cinzel">
               <Gamepad2 className="w-4 h-4 mr-2" />
               Assegna Pokémon
+            </TabsTrigger>
+            <TabsTrigger value="medals" className="font-cinzel">
+              <Medal className="w-4 h-4 mr-2" />
+              Assegna Medaglie
             </TabsTrigger>
           </TabsList>
 
@@ -778,6 +819,37 @@ export default function AdminPage() {
                 )}
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="medals">
+            <form onSubmit={assignMedal} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <section className="bg-white gold-border p-6 rounded-sm shadow-md">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-cinzel text-xl text-[#2C3E50] flex items-center gap-2"><Users className="w-5 h-5" /> Allenatori</h2>
+                  <button type="button" onClick={() => setSelectedMedalUsers(selectedMedalUsers.length === users.length ? [] : users.map((user) => user.id))} className="text-sm text-[#8E44AD] font-lato">
+                    {selectedMedalUsers.length === users.length && users.length ? "Deseleziona tutti" : "Seleziona tutti"}
+                  </button>
+                </div>
+                <p className="font-lato text-sm text-gray-500 mb-4">Seleziona uno o più allenatori che hanno ottenuto la medaglia.</p>
+                <div className="space-y-2 max-h-[430px] overflow-y-auto">
+                  {users.map((user) => <label key={user.id} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer ${selectedMedalUsers.includes(user.id) ? "border-[#D4AF37] bg-[#D4AF37]/10" : "border-gray-200"}`}>
+                    <input type="checkbox" checked={selectedMedalUsers.includes(user.id)} onChange={() => toggleMedalUser(user.id)} className="accent-[#8E44AD] w-4 h-4" />
+                    <span><span className="block font-cinzel text-sm text-[#2C3E50]">{user.username}</span><span className="block font-lato text-xs text-gray-400">{user.email}</span></span>
+                  </label>)}
+                </div>
+              </section>
+              <section className="bg-white gold-border p-6 rounded-sm shadow-md h-fit">
+                <h2 className="font-cinzel text-xl text-[#2C3E50] flex items-center gap-2 mb-6"><Medal className="w-5 h-5 text-[#D4AF37]" /> Nuova medaglia</h2>
+                <Label htmlFor="medal-name">Nome medaglia</Label>
+                <Input id="medal-name" value={medalForm.name} maxLength={80} onChange={(e) => setMedalForm({ ...medalForm, name: e.target.value })} placeholder="Es. Medaglia Roccia" className="mt-2 mb-5" />
+                <label className="block border-2 border-dashed border-[#D4AF37] rounded-lg p-6 text-center cursor-pointer hover:bg-[#D4AF37]/5">
+                  {medalForm.image ? <img src={medalForm.image} alt="Anteprima medaglia" className="w-32 h-32 object-contain mx-auto" /> : <><Upload className="w-10 h-10 text-[#D4AF37] mx-auto mb-2" /><span className="font-lato text-gray-500">Carica immagine dal dispositivo</span></>}
+                  <input type="file" accept="image/*" onChange={handleMedalImage} className="hidden" />
+                </label>
+                <p className="font-lato text-xs text-gray-400 mt-2">PNG, JPG o WEBP, massimo 2 MB.</p>
+                <Button type="submit" disabled={loading} className="btn-academy w-full mt-6">{loading ? "Assegnazione..." : `Assegna a ${selectedMedalUsers.length} allenatori`}</Button>
+              </section>
+            </form>
           </TabsContent>
         </Tabs>
       </main>

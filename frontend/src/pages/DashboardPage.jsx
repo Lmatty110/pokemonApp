@@ -123,6 +123,14 @@ export default function DashboardPage() {
                   <p className="font-cinzel text-sm text-[#2C3E50]">{user?.username}</p>
                   <p className="font-lato text-xs text-gray-400">{user?.email}</p>
                 </div>
+                <DropdownMenuItem
+                  data-testid="profile-menu-item"
+                  onClick={() => navigate("/profile")}
+                  className="cursor-pointer"
+                >
+                  <User className="w-4 h-4 mr-2 text-[#D4AF37]" />
+                  <span className="font-lato">Profilo</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem 
                   data-testid="my-pokemon-menu-item"
                   onClick={() => navigate("/my-pokemon")}
