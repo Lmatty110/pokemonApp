@@ -6,8 +6,13 @@ import api from "../api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
-const emptyProfile = { username: "", age: "", profile_image: null, mind: "", body: "", space: "", luck: "", medals: [] };
-const fields = [["mind", "MENTE"], ["body", "CORPO"], ["space", "SPAZIO"], ["luck", "FORTUNA"]];
+const emptyProfile = { username: "", age: "", savings: "", profile_image: null, mind: "", body: "", space: "", luck: "", medals: [] };
+const fields = [
+  ["mind", "MENTE", "bg-blue-600", "bg-blue-50 focus:bg-blue-100"],
+  ["body", "CORPO", "bg-red-600", "bg-red-50 focus:bg-red-100"],
+  ["space", "SPAZIO", "bg-yellow-400", "bg-yellow-50 focus:bg-yellow-100"],
+  ["luck", "FORTUNA", "bg-green-600", "bg-green-50 focus:bg-green-100"],
+];
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(emptyProfile);
@@ -36,7 +41,8 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       await api.put("/profile", {
-        age: profile.age === "" ? null : Number(profile.age), profile_image: profile.profile_image,
+        age: profile.age === "" ? null : Number(profile.age), savings: profile.savings,
+        profile_image: profile.profile_image,
         mind: profile.mind, body: profile.body, space: profile.space, luck: profile.luck,
       });
       toast.success("Profilo salvato");
@@ -54,14 +60,23 @@ export default function ProfilePage() {
     <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       <section className="bg-white gold-border rounded-lg p-6 sm:p-8 shadow-md">
         <div className="flex flex-col sm:flex-row items-center gap-6">
-          <button type="button" onClick={() => fileInput.current?.click()} className="relative w-36 h-36 rounded-full overflow-hidden border-4 border-[#D4AF37] bg-gray-100 group shrink-0">
-            {profile.profile_image ? <img src={profile.profile_image} alt="Foto profilo" className="w-full h-full object-cover" /> : <User className="w-16 h-16 text-gray-300 mx-auto" />}
-            <span className="absolute inset-x-0 bottom-0 py-2 bg-[#2C3E50]/85 text-white flex justify-center opacity-90 group-hover:opacity-100"><Camera className="w-5 h-5" /></span>
-          </button>
+          <div className="shrink-0 text-center">
+            <button type="button" onClick={() => fileInput.current?.click()} className="w-36 h-36 rounded-full overflow-hidden border-4 border-[#D4AF37] bg-gray-100 flex items-center justify-center group">
+              {profile.profile_image ? <img src={profile.profile_image} alt="Foto profilo" className="w-full h-full rounded-full object-cover object-center" /> : <User className="w-16 h-16 text-gray-300" />}
+            </button>
+            <button type="button" onClick={() => fileInput.current?.click()} className="mt-2 inline-flex items-center justify-center gap-2 text-sm text-[#2C3E50] hover:text-[#D4AF37] font-lato">
+              <Camera className="w-4 h-4" /> {profile.profile_image ? "Cambia foto" : "Carica foto"}
+            </button>
+          </div>
           <input ref={fileInput} type="file" accept="image/*" onChange={chooseImage} className="hidden" />
           <div className="flex-1 w-full"><p className="font-lato text-sm uppercase tracking-widest text-[#D4AF37]">Profilo allenatore</p><h1 className="font-cinzel text-3xl text-[#2C3E50] mt-1">{profile.username}</h1>
             <label className="block mt-5 max-w-xs font-lato text-sm text-gray-600">Età
               <Input type="number" min="0" max="120" value={profile.age ?? ""} onChange={(e) => setProfile({ ...profile, age: e.target.value })} className="mt-1" placeholder="Inserisci la tua età" />
+            </label>
+          </div>
+          <div className="w-full sm:w-64 sm:self-start sm:text-right">
+            <label className="block font-cinzel text-lg text-[#2C3E50]">Risparmi
+              <Input value={profile.savings ?? ""} onChange={(e) => setProfile({ ...profile, savings: e.target.value })} maxLength={100} className="mt-2 text-left font-lato" placeholder="Inserisci i risparmi" />
             </label>
           </div>
         </div>
@@ -69,9 +84,9 @@ export default function ProfilePage() {
 
       <section className="bg-white gold-border rounded-lg shadow-md overflow-hidden">
         <div className="grid grid-cols-2 md:grid-cols-4">
-          {fields.map(([key, title]) => <div key={key} className="border-r border-b md:border-b-0 last:border-r-0 border-[#D4AF37]/40">
-            <h2 className="font-cinzel text-center text-white bg-[#2C3E50] py-3">{title}</h2>
-            <textarea value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className="w-full h-40 p-4 resize-none outline-none focus:bg-[#D4AF37]/5 font-lato" />
+          {fields.map(([key, title, headerColor, bodyColor]) => <div key={key} className="border-r border-b md:border-b-0 last:border-r-0 border-white/70">
+            <h2 className={`font-cinzel text-center text-white py-3 ${headerColor}`}>{title}</h2>
+            <textarea value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className={`w-full h-40 p-4 resize-none outline-none font-lato text-2xl text-center ${bodyColor}`} />
           </div>)}
         </div>
       </section>

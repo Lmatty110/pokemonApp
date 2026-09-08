@@ -77,6 +77,7 @@ class UserResponse(BaseModel):
 
 class ProfileUpdate(BaseModel):
     age: Optional[int] = Field(default=None, ge=0, le=120)
+    savings: str = Field(default="", max_length=100)
     profile_image: Optional[str] = None
     mind: str = Field(default="", max_length=500)
     body: str = Field(default="", max_length=500)
@@ -431,6 +432,7 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
         "username": current_user["username"],
         "email": current_user["email"],
         "age": profile.get("age") if profile else None,
+        "savings": profile.get("savings", "") if profile else "",
         "profile_image": profile.get("profile_image") if profile else None,
         "mind": profile.get("mind", "") if profile else "",
         "body": profile.get("body", "") if profile else "",
