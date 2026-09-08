@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Medal, Save, User } from "lucide-react";
+import { ArrowLeft, Camera, Coins, Medal, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { Button } from "../components/ui/button";
@@ -74,9 +74,13 @@ export default function ProfilePage() {
               <Input type="number" min="0" max="120" value={profile.age ?? ""} onChange={(e) => setProfile({ ...profile, age: e.target.value })} className="mt-1" placeholder="Inserisci la tua età" />
             </label>
           </div>
-          <div className="w-full sm:w-64 sm:self-start sm:text-right">
-            <label className="block font-cinzel text-lg text-[#2C3E50]">Risparmi
-              <Input value={profile.savings ?? ""} onChange={(e) => setProfile({ ...profile, savings: e.target.value })} maxLength={100} className="mt-2 text-left font-lato" placeholder="Inserisci i risparmi" />
+          <div className="w-full sm:w-72 sm:self-start rounded-lg border border-[#D4AF37]/60 bg-gradient-to-br from-[#FFF9E6] to-white p-4 shadow-sm">
+            <label className="block">
+              <span className="flex items-center gap-2 font-cinzel text-lg text-[#2C3E50]"><span className="w-9 h-9 rounded-full bg-[#D4AF37] flex items-center justify-center"><Coins className="w-5 h-5 text-white" /></span> Risparmi</span>
+              <div className="relative mt-3">
+                <Input value={profile.savings ?? ""} onChange={(e) => setProfile({ ...profile, savings: e.target.value })} maxLength={100} className="pr-10 bg-white border-[#D4AF37]/50 font-lato text-lg" placeholder="Inserisci i risparmi" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#D4AF37] font-bold">₽</span>
+              </div>
             </label>
           </div>
         </div>
@@ -86,7 +90,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-2 md:grid-cols-4">
           {fields.map(([key, title, headerColor, bodyColor]) => <div key={key} className="border-r border-b md:border-b-0 last:border-r-0 border-white/70">
             <h2 className={`font-cinzel text-center text-white py-3 ${headerColor}`}>{title}</h2>
-            <textarea value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className={`w-full h-40 p-4 resize-none outline-none font-lato text-2xl text-center ${bodyColor}`} />
+            <textarea value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className={`w-full h-40 p-4 resize-none outline-none font-lato text-4xl leading-relaxed text-center ${bodyColor}`} />
           </div>)}
         </div>
       </section>
@@ -94,8 +98,11 @@ export default function ProfilePage() {
       <section className="bg-white gold-border rounded-lg p-6 sm:p-8 shadow-md">
         <h2 className="font-cinzel text-2xl text-[#2C3E50] flex items-center gap-2 mb-6"><Medal className="text-[#D4AF37]" /> Medagliere</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4">
-          {Array.from({ length: 8 }, (_, index) => { const medal = profile.medals[index]; return <div key={medal?.id || index} className="aspect-square rounded-full border-2 border-dashed border-[#D4AF37]/60 bg-[#FDFBF7] flex flex-col items-center justify-center p-2" title={medal?.name || "Slot vuoto"}>
-            {medal ? <><img src={medal.image} alt={medal.name} className="w-14 h-14 object-contain" /><span className="text-[10px] text-center font-lato mt-1 line-clamp-1">{medal.name}</span></> : <Medal className="w-9 h-9 text-gray-200" />}
+          {Array.from({ length: 8 }, (_, index) => { const medal = profile.medals[index]; return <div key={medal?.id || index} className="min-w-0 text-center" title={medal?.name || "Slot vuoto"}>
+            <div className="aspect-square rounded-full overflow-hidden border-2 border-dashed border-[#D4AF37]/60 bg-[#FDFBF7] flex items-center justify-center">
+              {medal ? <img src={medal.image} alt={medal.name} className="w-full h-full object-cover rounded-full" /> : <Medal className="w-9 h-9 text-gray-200" />}
+            </div>
+            <p className="h-8 mt-2 px-1 text-[11px] leading-tight text-center font-lato text-[#2C3E50] line-clamp-2">{medal?.name || ""}</p>
           </div>; })}
         </div>
       </section>
