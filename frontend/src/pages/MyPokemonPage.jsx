@@ -19,6 +19,12 @@ export default function MyPokemonPage() {
     fetchMyPokemon();
   }, [token]);
 
+  useEffect(() => {
+    if (!loading && window.location.hash === "#active-team") {
+      document.getElementById("active-team")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [loading]);
+
   const fetchMyPokemon = async () => {
     try {
       const [pokemonResponse, teamResponse] = await Promise.all([
@@ -103,7 +109,7 @@ export default function MyPokemonPage() {
         </div>
 
         {pokemon.length > 0 && (
-          <section className="mb-10 bg-white gold-border rounded-lg p-5 sm:p-7 shadow-md">
+          <section id="active-team" className="scroll-mt-6 mb-10 bg-white gold-border rounded-lg p-5 sm:p-7 shadow-md">
             <div className="flex items-center justify-between gap-3 mb-5">
               <div><h2 className="font-cinzel text-xl sm:text-2xl text-[#2C3E50] flex items-center gap-2"><Shield className="text-[#D4AF37]" /> Squadra Attiva</h2><p className="font-lato text-sm text-gray-500 mt-1">Scegli fino a 3 Pokémon dalla tua collezione.</p></div>
               <span className="font-cinzel text-[#8E44AD]">{activeTeam.length}/3</span>

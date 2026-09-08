@@ -22,12 +22,13 @@ import {
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
-import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack } from "lucide-react";
+import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack, Plus } from "lucide-react";
 
 export default function DashboardPage() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [quizHistory, setQuizHistory] = useState([]);
+  const [activeTeam, setActiveTeam] = useState([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const navigate = useNavigate();
   const { user, token, logout } = useAuth();
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchNews();
     fetchQuizHistory();
+    fetchActiveTeam();
   }, [token]);
 
   const fetchNews = async () => {
@@ -58,6 +60,17 @@ export default function DashboardPage() {
       setQuizHistory(response.data);
     } catch (error) {
       console.error("Error fetching quiz history:", error);
+    }
+  };
+
+  const fetchActiveTeam = async () => {
+    try {
+      const response = await api.get("/pokemon/active-team", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setActiveTeam(response.data);
+    } catch (error) {
+      console.error("Error fetching active team:", error);
     }
   };
 
@@ -165,7 +178,8 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Welcome Section */}
-        <div className="mb-12 animate-fade-in">
+        <div className="mb-12 animate-fade-in flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
+          <div>
           <h2 
             data-testid="welcome-title"
             className="font-cinzel text-2xl sm:text-3xl text-[#2C3E50] mb-2"
@@ -175,6 +189,27 @@ export default function DashboardPage() {
           <p className="font-lato text-gray-600">
             Consulta le ultime novità dall'Accademia
           </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/my-pokemon#active-team")}
+            className="w-full sm:w-auto min-w-64 rounded-lg border border-[#D4AF37]/70 bg-white px-4 py-3 shadow-sm hover:shadow-md hover:border-[#D4AF37] transition-all text-left"
+            aria-label="Apri la Squadra Attiva"
+          >
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <span className="font-cinzel text-sm text-[#2C3E50]">Squadra Attiva</span>
+              <span className="font-courier text-xs text-[#8E44AD]">{activeTeam.length}/3</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {Array.from({ length: 3 }, (_, index) => {
+                const member = activeTeam[index];
+                return <span key={member?.id || index} className="w-14 h-14 rounded-full border-2 border-[#D4AF37]/60 bg-[#FDFBF7] flex items-center justify-center overflow-hidden">
+                  {member ? <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${member.pokemon_id}.png`} alt={member.nickname || member.pokemon_name} className="w-full h-full object-contain" /> : <Plus className="w-5 h-5 text-gray-300" />}
+                </span>;
+              })}
+              <ChevronRight className="w-5 h-5 ml-auto text-[#D4AF37]" />
+            </div>
+          </button>
         </div>
 
         {/* News Grid - Bento Style */}
