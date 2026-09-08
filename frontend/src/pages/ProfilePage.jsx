@@ -14,6 +14,11 @@ const fields = [
   ["luck", "FORTUNA", "bg-green-600", "bg-green-50 focus:bg-green-100"],
 ];
 
+const formatSavings = (value) => {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? digits.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
+};
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState(emptyProfile);
   const [loading, setLoading] = useState(true);
@@ -22,7 +27,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get("/profile").then(({ data }) => setProfile(data)).catch(() => toast.error("Impossibile caricare il profilo")).finally(() => setLoading(false));
+    api.get("/profile").then(({ data }) => setProfile({ ...data, savings: formatSavings(data.savings) })).catch(() => toast.error("Impossibile caricare il profilo")).finally(() => setLoading(false));
   }, []);
 
   const chooseImage = (event) => {
@@ -69,16 +74,12 @@ export default function ProfilePage() {
             </button>
           </div>
           <input ref={fileInput} type="file" accept="image/*" onChange={chooseImage} className="hidden" />
-          <div className="flex-1 w-full"><p className="font-lato text-sm uppercase tracking-widest text-[#D4AF37]">Profilo allenatore</p><h1 className="font-cinzel text-3xl text-[#2C3E50] mt-1">{profile.username}</h1>
-            <label className="block mt-5 max-w-xs font-lato text-sm text-gray-600">Età
-              <Input type="number" min="0" max="120" value={profile.age ?? ""} onChange={(e) => setProfile({ ...profile, age: e.target.value })} className="mt-1" placeholder="Inserisci la tua età" />
-            </label>
-          </div>
+          <div className="flex-1 w-full"><p className="font-lato text-sm uppercase tracking-widest text-[#D4AF37]">Profilo allenatore</p><h1 className="font-cinzel text-3xl text-[#2C3E50] mt-1">{profile.username}</h1></div>
           <div className="w-full sm:w-72 sm:self-start rounded-lg border border-[#D4AF37]/60 bg-gradient-to-br from-[#FFF9E6] to-white p-4 shadow-sm">
             <label className="block">
               <span className="flex items-center gap-2 font-cinzel text-lg text-[#2C3E50]"><span className="w-9 h-9 rounded-full bg-[#D4AF37] flex items-center justify-center"><Coins className="w-5 h-5 text-white" /></span> Risparmi</span>
               <div className="relative mt-3">
-                <Input value={profile.savings ?? ""} onChange={(e) => setProfile({ ...profile, savings: e.target.value })} maxLength={100} className="pr-10 bg-white border-[#D4AF37]/50 font-lato text-lg" placeholder="Inserisci i risparmi" />
+                <Input inputMode="numeric" value={profile.savings ?? ""} onChange={(e) => setProfile({ ...profile, savings: formatSavings(e.target.value) })} maxLength={25} className="pr-10 bg-white border-[#D4AF37]/50 font-lato text-lg" placeholder="Inserisci i risparmi" />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#D4AF37] font-bold">₽</span>
               </div>
             </label>
