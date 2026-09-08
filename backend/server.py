@@ -97,6 +97,9 @@ class InventoryItemAdd(BaseModel):
 class InventoryQuantityUpdate(BaseModel):
     delta: int = Field(ge=-1, le=1)
 
+class ActiveTeamUpdate(BaseModel):
+    pokemon_ids: List[str] = Field(max_length=3)
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -661,6 +664,35 @@ async def get_my_pokemon(current_user: dict = Depends(get_current_user)):
         {"_id": 0}
     ).to_list(100)
     return pokemon
+
+@api_router.get("/pokemon/active-team")
+async def get_active_team(current_user: dict = Depends(get_current_user)):
+    team = await db.active_teams.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    if not team or not team.get("pokemon_ids"):
+        return []
+    owned = await db.user_pokemon.find({
+        "user_id": current_user["id"], "id": {"$in": team["pokemon_ids"]}
+    }, {"_id": 0}).to_list(3)
+    by_id = {pokemon["id"]: pokemon for pokemon in owned}
+    return [by_id[pokemon_id] for pokemon_id in team["pokemon_ids"] if pokemon_id in by_id]
+
+@api_router.put("/pokemon/active-team")
+async def update_active_team(team_data: ActiveTeamUpdate, current_user: dict = Depends(get_current_user)):
+    pokemon_ids = list(dict.fromkeys(team_data.pokemon_ids))
+    if len(pokemon_ids) != len(team_data.pokemon_ids):
+        raise HTTPException(status_code=400, detail="La squadra contiene duplicati")
+    owned_count = await db.user_pokemon.count_documents({
+        "user_id": current_user["id"], "id": {"$in": pokemon_ids}
+    })
+    if owned_count != len(pokemon_ids):
+        raise HTTPException(status_code=400, detail="Puoi scegliere solo Pokémon che possiedi")
+    await db.active_teams.update_one(
+        {"user_id": current_user["id"]},
+        {"$set": {"pokemon_ids": pokemon_ids, "updated_at": datetime.now(timezone.utc).isoformat()},
+         "$setOnInsert": {"user_id": current_user["id"]}},
+        upsert=True,
+    )
+    return {"pokemon_ids": pokemon_ids}
 
 @api_router.get("/pokemon/my/{pokemon_id}")
 async def get_my_pokemon_detail(pokemon_id: int, current_user: dict = Depends(get_current_user)):

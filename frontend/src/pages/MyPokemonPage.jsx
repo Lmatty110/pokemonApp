@@ -5,12 +5,13 @@ import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
-import { ArrowLeft, Search, Package } from "lucide-react";
+import { ArrowLeft, Search, Package, Plus, Shield, X } from "lucide-react";
 
 export default function MyPokemonPage() {
   const [pokemon, setPokemon] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTeam, setActiveTeam] = useState([]);
   const navigate = useNavigate();
   const { token } = useAuth();
 
@@ -20,10 +21,12 @@ export default function MyPokemonPage() {
 
   const fetchMyPokemon = async () => {
     try {
-      const response = await api.get(`/pokemon/my`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setPokemon(response.data);
+      const [pokemonResponse, teamResponse] = await Promise.all([
+        api.get(`/pokemon/my`, { headers: { Authorization: `Bearer ${token}` } }),
+        api.get(`/pokemon/active-team`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      setPokemon(pokemonResponse.data);
+      setActiveTeam(teamResponse.data);
     } catch (error) {
       toast.error("Errore nel caricamento dei Pokemon");
     } finally {
@@ -37,6 +40,25 @@ export default function MyPokemonPage() {
 
   const getPokemonSprite = (pokemonId) => {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`;
+  };
+
+  const updateTeam = async (nextTeam) => {
+    const previousTeam = activeTeam;
+    setActiveTeam(nextTeam);
+    try {
+      await api.put("/pokemon/active-team", { pokemon_ids: nextTeam.map((entry) => entry.id) });
+      toast.success("Squadra attiva aggiornata");
+    } catch (error) {
+      setActiveTeam(previousTeam);
+      toast.error(error.response?.data?.detail || "Impossibile aggiornare la squadra");
+    }
+  };
+
+  const toggleActivePokemon = (selectedPokemon) => {
+    const isActive = activeTeam.some((entry) => entry.id === selectedPokemon.id);
+    if (isActive) return updateTeam(activeTeam.filter((entry) => entry.id !== selectedPokemon.id));
+    if (activeTeam.length >= 3) return toast.error("La Squadra Attiva può contenere al massimo 3 Pokémon");
+    updateTeam([...activeTeam, selectedPokemon]);
   };
 
   if (loading) {
@@ -79,6 +101,24 @@ export default function MyPokemonPage() {
             I Pokémon che ti sono stati assegnati dall'Accademia
           </p>
         </div>
+
+        {pokemon.length > 0 && (
+          <section className="mb-10 bg-white gold-border rounded-lg p-5 sm:p-7 shadow-md">
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <div><h2 className="font-cinzel text-xl sm:text-2xl text-[#2C3E50] flex items-center gap-2"><Shield className="text-[#D4AF37]" /> Squadra Attiva</h2><p className="font-lato text-sm text-gray-500 mt-1">Scegli fino a 3 Pokémon dalla tua collezione.</p></div>
+              <span className="font-cinzel text-[#8E44AD]">{activeTeam.length}/3</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }, (_, index) => { const member = activeTeam[index]; return member ? (
+                <div key={member.id} onClick={() => navigate(`/pokemon/${member.pokemon_id}`)} className="relative min-h-40 rounded-lg border-2 border-[#D4AF37] bg-gradient-to-b from-[#FFF9E6] to-white p-3 cursor-pointer group flex items-center gap-3">
+                  <button onClick={(event) => { event.stopPropagation(); toggleActivePokemon(member); }} aria-label={`Rimuovi ${member.nickname || member.pokemon_name} dalla squadra`} className="absolute right-2 top-2 w-8 h-8 min-w-0 min-h-0 rounded-full bg-red-500 text-white flex items-center justify-center z-10"><X className="w-4 h-4" /></button>
+                  <img src={getPokemonSprite(member.pokemon_id)} alt={member.pokemon_name} className="w-28 h-28 object-contain group-hover:scale-105 transition-transform" />
+                  <div className="min-w-0"><p className="font-cinzel text-[#2C3E50] capitalize truncate">{member.nickname || member.pokemon_name}</p>{member.nickname && <p className="font-lato text-xs text-gray-400 capitalize">{member.pokemon_name}</p>}<p className="font-courier text-sm text-[#8E44AD] mt-2">Liv. {member.level ?? "--"}</p>{member.held_item && <div className="flex items-center gap-1 mt-2" title={member.held_item.display_name}>{member.held_item.sprite ? <img src={member.held_item.sprite} alt="" className="w-7 h-7 object-contain" /> : <Package className="w-5 h-5" />}<span className="text-xs font-lato truncate">{member.held_item.display_name}</span></div>}</div>
+                </div>
+              ) : <div key={index} className="min-h-40 rounded-lg border-2 border-dashed border-[#D4AF37]/50 bg-[#FDFBF7] flex flex-col items-center justify-center text-gray-300"><Plus className="w-9 h-9" /><span className="font-lato text-sm mt-2">Slot squadra</span></div>; })}
+            </div>
+          </section>
+        )}
 
         {/* Search */}
         {pokemon.length > 0 && (
@@ -139,6 +179,12 @@ export default function MyPokemonPage() {
                 <p className="font-courier text-center text-gray-400 text-xs">
                   #{p.pokemon_id.toString().padStart(3, '0')}
                 </p>
+                <button
+                  onClick={(event) => { event.stopPropagation(); toggleActivePokemon(p); }}
+                  className={`mt-3 w-full min-h-9 rounded-md text-xs font-lato flex items-center justify-center gap-1 ${activeTeam.some((entry) => entry.id === p.id) ? "bg-[#D4AF37] text-white" : "bg-[#2C3E50] text-white hover:bg-[#34495E]"}`}
+                >
+                  {activeTeam.some((entry) => entry.id === p.id) ? <><X className="w-3 h-3" /> Rimuovi</> : <><Plus className="w-3 h-3" /> In squadra</>}
+                </button>
               </div>
             ))}
           </div>
