@@ -788,6 +788,13 @@ async def assign_medal_admin(medal_data: MedalAssign, admin: dict = Depends(get_
     await db.user_medals.insert_many(documents)
     return {"assigned": len(documents)}
 
+@api_router.delete("/admin/users/{user_id}/medals/{medal_id}")
+async def remove_user_medal_admin(user_id: str, medal_id: str, admin: dict = Depends(get_admin_user)):
+    result = await db.user_medals.delete_one({"id": medal_id, "user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Medaglia assegnata non trovata")
+    return {"message": "Medaglia rimossa con successo"}
+
 @api_router.post("/admin/inventory")
 async def assign_inventory_admin(item_data: AdminInventoryAssign, admin: dict = Depends(get_admin_user)):
     user_ids = list(dict.fromkeys(item_data.user_ids))

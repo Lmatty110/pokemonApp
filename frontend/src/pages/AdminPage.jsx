@@ -68,6 +68,8 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("news");
   const [selectedMedalUsers, setSelectedMedalUsers] = useState([]);
   const [medalForm, setMedalForm] = useState({ name: "", image: "" });
+  const [assignedMedals, setAssignedMedals] = useState([]);
+  const [medalUserFilter, setMedalUserFilter] = useState("");
   const [selectedItemUsers, setSelectedItemUsers] = useState([]);
   const [itemCatalog, setItemCatalog] = useState([]);
   const [itemSearch, setItemSearch] = useState("");
@@ -354,9 +356,25 @@ export default function AdminPage() {
       toast.success(`Medaglia assegnata a ${data.assigned} allenatori`);
       setSelectedMedalUsers([]);
       setMedalForm({ name: "", image: "" });
+      fetchAssignedMedals();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Errore durante l'assegnazione");
     } finally { setLoading(false); }
+  };
+
+  const fetchAssignedMedals = async () => {
+    try {
+      const { data } = await api.get("/admin/medals", { headers: { Authorization: `Bearer ${token}` } });
+      setAssignedMedals(data);
+    } catch { toast.error("Impossibile caricare le medaglie assegnate"); }
+  };
+
+  const removeAssignedMedal = async (medal) => {
+    try {
+      await api.delete(`/admin/users/${medal.user_id}/medals/${medal.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setAssignedMedals((current) => current.filter((entry) => entry.id !== medal.id));
+      toast.success("Medaglia rimossa dall'allenatore");
+    } catch (error) { toast.error(error.response?.data?.detail || "Impossibile rimuovere la medaglia"); }
   };
 
   const loadItemCatalog = async () => {
@@ -514,7 +532,7 @@ export default function AdminPage() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); if (value === "items") loadItemCatalog(); }} className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); if (value === "items") loadItemCatalog(); if (value === "medals") fetchAssignedMedals(); }} className="w-full">
           <TabsList className="grid w-full max-w-4xl grid-cols-2 sm:grid-cols-4 h-auto mb-8">
             <TabsTrigger value="news" className="font-cinzel">
               <Bell className="w-4 h-4 mr-2" />
@@ -897,6 +915,18 @@ export default function AdminPage() {
                 </label>
                 <p className="font-lato text-xs text-gray-400 mt-2">PNG, JPG o WEBP, massimo 2 MB.</p>
                 <Button type="submit" disabled={loading} className="btn-academy w-full mt-6">{loading ? "Assegnazione..." : `Assegna a ${selectedMedalUsers.length} allenatori`}</Button>
+              </section>
+              <section className="lg:col-span-2 bg-white gold-border p-6 rounded-sm shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+                  <div><h2 className="font-cinzel text-xl text-[#2C3E50] flex items-center gap-2"><Medal className="w-5 h-5 text-[#D4AF37]" /> Medaglie assegnate</h2><p className="font-lato text-sm text-gray-500 mt-1">Seleziona un allenatore e rimuovi le medaglie non più valide.</p></div>
+                  <Select value={medalUserFilter} onValueChange={setMedalUserFilter}>
+                    <SelectTrigger className="w-full sm:w-64"><SelectValue placeholder="Scegli allenatore" /></SelectTrigger>
+                    <SelectContent>{users.map((user) => <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {!medalUserFilter ? <p className="py-8 text-center font-lato text-gray-400">Scegli un allenatore per vedere le sue medaglie.</p> : assignedMedals.filter((medal) => medal.user_id === medalUserFilter).length ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">{assignedMedals.filter((medal) => medal.user_id === medalUserFilter).map((medal) => <div key={medal.id} className="relative text-center group"><div className="aspect-square rounded-full overflow-hidden border-2 border-[#D4AF37] bg-[#FDFBF7]"><img src={medal.image} alt={medal.name} className="w-full h-full object-cover" /></div><p className="font-lato text-xs mt-2 line-clamp-2">{medal.name}</p><button type="button" onClick={() => removeAssignedMedal(medal)} aria-label={`Rimuovi ${medal.name}`} className="absolute -top-1 -right-1 w-8 h-8 min-w-0 min-h-0 rounded-full bg-red-500 text-white shadow flex items-center justify-center opacity-90 hover:bg-red-600"><Trash2 className="w-4 h-4" /></button></div>)}</div>
+                ) : <p className="py-8 text-center font-lato text-gray-400">Questo allenatore non ha ancora medaglie.</p>}
               </section>
             </form>
           </TabsContent>

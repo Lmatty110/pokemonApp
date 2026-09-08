@@ -91,7 +91,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-2 md:grid-cols-4">
           {fields.map(([key, title, headerColor, bodyColor]) => <div key={key} className="border-r border-b md:border-b-0 last:border-r-0 border-white/70">
             <h2 className={`font-cinzel text-center text-white py-3 ${headerColor}`}>{title}</h2>
-            <textarea value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className={`w-full h-40 p-4 resize-none outline-none font-lato text-4xl leading-relaxed text-center ${bodyColor}`} />
+            <textarea value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className={`w-full h-32 p-4 resize-none outline-none font-lato text-4xl leading-relaxed text-center ${bodyColor}`} />
           </div>)}
         </div>
       </section>
