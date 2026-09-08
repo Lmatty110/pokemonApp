@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
-import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2 } from "lucide-react";
+import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack } from "lucide-react";
 
 export default function DashboardPage() {
   const [news, setNews] = useState([]);
@@ -130,6 +130,14 @@ export default function DashboardPage() {
                 >
                   <User className="w-4 h-4 mr-2 text-[#D4AF37]" />
                   <span className="font-lato">Profilo</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="inventory-menu-item"
+                  onClick={() => navigate("/inventory")}
+                  className="cursor-pointer"
+                >
+                  <Backpack className="w-4 h-4 mr-2 text-[#C0392B]" />
+                  <span className="font-lato">Zaino</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   data-testid="my-pokemon-menu-item"

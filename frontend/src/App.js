@@ -15,6 +15,7 @@ import NewsDetailPage from "./pages/NewsDetailPage";
 import MyPokemonPage from "./pages/MyPokemonPage";
 import PokemonDetailPage from "./pages/PokemonDetailPage";
 import ProfilePage from "./pages/ProfilePage";
+import InventoryPage from "./pages/InventoryPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -142,6 +143,10 @@ function App() {
           <Route
             path="/profile"
             element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}
+          />
+          <Route
+            path="/inventory"
+            element={<ProtectedRoute><InventoryPage /></ProtectedRoute>}
           />
           <Route
             path="/pokemon/:pokemonId"

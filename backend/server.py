@@ -89,6 +89,14 @@ class MedalAssign(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     image: str
 
+class InventoryItemAdd(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    display_name: str = Field(min_length=1, max_length=150)
+    sprite: Optional[str] = None
+
+class InventoryQuantityUpdate(BaseModel):
+    delta: int = Field(ge=-1, le=1)
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -453,6 +461,45 @@ async def update_profile(profile_data: ProfileUpdate, current_user: dict = Depen
         upsert=True,
     )
     return {"message": "Profilo aggiornato"}
+
+# ============== INVENTORY ROUTES ==============
+
+@api_router.get("/inventory")
+async def get_inventory(current_user: dict = Depends(get_current_user)):
+    return await db.user_inventory.find(
+        {"user_id": current_user["id"]}, {"_id": 0}
+    ).sort("display_name", 1).to_list(1000)
+
+@api_router.post("/inventory")
+async def add_inventory_item(item: InventoryItemAdd, current_user: dict = Depends(get_current_user)):
+    existing = await db.user_inventory.find_one({"user_id": current_user["id"], "name": item.name}, {"_id": 0})
+    if existing:
+        if existing["quantity"] < 999:
+            await db.user_inventory.update_one({"id": existing["id"]}, {"$inc": {"quantity": 1}})
+    else:
+        document = {
+            "id": str(uuid.uuid4()), "user_id": current_user["id"],
+            "name": item.name, "display_name": item.display_name,
+            "sprite": item.sprite, "quantity": 1,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.user_inventory.insert_one(document)
+    return await db.user_inventory.find_one({"user_id": current_user["id"], "name": item.name}, {"_id": 0})
+
+@api_router.patch("/inventory/{item_name}")
+async def update_inventory_quantity(item_name: str, update: InventoryQuantityUpdate, current_user: dict = Depends(get_current_user)):
+    if update.delta == 0:
+        raise HTTPException(status_code=400, detail="Variazione non valida")
+    item = await db.user_inventory.find_one({"user_id": current_user["id"], "name": item_name}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Strumento non trovato")
+    new_quantity = min(999, item["quantity"] + update.delta)
+    if new_quantity <= 0:
+        await db.user_inventory.delete_one({"id": item["id"]})
+        return {"removed": True}
+    await db.user_inventory.update_one({"id": item["id"]}, {"$set": {"quantity": new_quantity}})
+    item["quantity"] = new_quantity
+    return item
 
 # ============== ADMIN ROUTES ==============
 
