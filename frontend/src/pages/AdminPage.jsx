@@ -47,7 +47,9 @@ import {
   X,
   Gamepad2,
   Medal,
-  Upload
+  Upload,
+  Backpack,
+  Package
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -66,6 +68,12 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("news");
   const [selectedMedalUsers, setSelectedMedalUsers] = useState([]);
   const [medalForm, setMedalForm] = useState({ name: "", image: "" });
+  const [selectedItemUsers, setSelectedItemUsers] = useState([]);
+  const [itemCatalog, setItemCatalog] = useState([]);
+  const [itemSearch, setItemSearch] = useState("");
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [itemQuantity, setItemQuantity] = useState(1);
+  const [itemsLoading, setItemsLoading] = useState(false);
   
   // Pokemon assignment states
   const [selectedUser, setSelectedUser] = useState(null);
@@ -351,6 +359,43 @@ export default function AdminPage() {
     } finally { setLoading(false); }
   };
 
+  const loadItemCatalog = async () => {
+    if (itemCatalog.length || itemsLoading) return;
+    setItemsLoading(true);
+    try {
+      const cached = sessionStorage.getItem("pokemon-items-complete-v2");
+      if (cached) { setItemCatalog(JSON.parse(cached)); return; }
+      const { data } = await axios.get("https://pokeapi.co/api/v2/item?limit=3000");
+      const catalog = (data.results || []).map((item) => ({ name: item.name, displayName: item.name.replaceAll("-", " "), sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png` }));
+      setItemCatalog(catalog);
+      sessionStorage.setItem("pokemon-items-complete-v2", JSON.stringify(catalog));
+    } catch { toast.error("Impossibile caricare il catalogo strumenti"); }
+    finally { setItemsLoading(false); }
+  };
+
+  const toggleItemUser = (userId) => setSelectedItemUsers((current) => current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId]);
+
+  const assignItem = async (event) => {
+    event.preventDefault();
+    if (!selectedItemUsers.length || !selectedItem) return toast.error("Seleziona almeno un allenatore e uno strumento");
+    setLoading(true);
+    try {
+      const { data } = await api.post("/admin/inventory", {
+        user_ids: selectedItemUsers, name: selectedItem.name,
+        display_name: selectedItem.displayName, sprite: selectedItem.sprite,
+        quantity: Number(itemQuantity),
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success(`Strumento assegnato a ${data.assigned} allenatori`);
+      setSelectedItemUsers([]); setSelectedItem(null); setItemSearch(""); setItemQuantity(1);
+    } catch (error) { toast.error(error.response?.data?.detail || "Errore durante l'assegnazione"); }
+    finally { setLoading(false); }
+  };
+
+  const filteredAdminItems = itemCatalog.filter((item) => {
+    const query = itemSearch.trim().toLowerCase();
+    return !query || item.displayName.toLowerCase().includes(query) || item.name.includes(query);
+  }).slice(0, 60);
+
   // Login Screen
   if (!isLoggedIn) {
     return (
@@ -469,8 +514,8 @@ export default function AdminPage() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3 mb-8">
+        <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); if (value === "items") loadItemCatalog(); }} className="w-full">
+          <TabsList className="grid w-full max-w-4xl grid-cols-2 sm:grid-cols-4 h-auto mb-8">
             <TabsTrigger value="news" className="font-cinzel">
               <Bell className="w-4 h-4 mr-2" />
               Gestione News
@@ -482,6 +527,10 @@ export default function AdminPage() {
             <TabsTrigger value="medals" className="font-cinzel">
               <Medal className="w-4 h-4 mr-2" />
               Assegna Medaglie
+            </TabsTrigger>
+            <TabsTrigger value="items" className="font-cinzel">
+              <Backpack className="w-4 h-4 mr-2" />
+              Assegna Oggetti
             </TabsTrigger>
           </TabsList>
 
@@ -848,6 +897,23 @@ export default function AdminPage() {
                 </label>
                 <p className="font-lato text-xs text-gray-400 mt-2">PNG, JPG o WEBP, massimo 2 MB.</p>
                 <Button type="submit" disabled={loading} className="btn-academy w-full mt-6">{loading ? "Assegnazione..." : `Assegna a ${selectedMedalUsers.length} allenatori`}</Button>
+              </section>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="items">
+            <form onSubmit={assignItem} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <section className="bg-white gold-border p-6 rounded-sm shadow-md">
+                <div className="flex items-center justify-between gap-3 mb-5"><h2 className="font-cinzel text-xl text-[#2C3E50] flex items-center gap-2"><Users className="w-5 h-5" /> Allenatori</h2><button type="button" onClick={() => setSelectedItemUsers(selectedItemUsers.length === users.length ? [] : users.map((user) => user.id))} className="text-sm text-[#8E44AD] font-lato">{selectedItemUsers.length === users.length && users.length ? "Deseleziona tutti" : "Seleziona tutti"}</button></div>
+                <p className="font-lato text-sm text-gray-500 mb-4">Seleziona uno o più allenatori a cui consegnare lo strumento.</p>
+                <div className="space-y-2 max-h-[520px] overflow-y-auto">{users.map((user) => <label key={user.id} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer ${selectedItemUsers.includes(user.id) ? "border-[#D4AF37] bg-[#D4AF37]/10" : "border-gray-200"}`}><input type="checkbox" checked={selectedItemUsers.includes(user.id)} onChange={() => toggleItemUser(user.id)} className="accent-[#8E44AD] w-4 h-4" /><span><span className="block font-cinzel text-sm text-[#2C3E50]">{user.username}</span><span className="block font-lato text-xs text-gray-400">{user.email}</span></span></label>)}</div>
+              </section>
+              <section className="bg-white gold-border p-6 rounded-sm shadow-md">
+                <h2 className="font-cinzel text-xl text-[#2C3E50] flex items-center gap-2 mb-5"><Backpack className="w-5 h-5 text-[#D4AF37]" /> Scegli oggetto</h2>
+                <div className="relative mb-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder="Cerca uno strumento..." className="pl-10" /></div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-80 overflow-y-auto p-1">{itemsLoading ? <p className="col-span-full text-center py-10">Caricamento...</p> : filteredAdminItems.map((item) => <button type="button" key={item.name} onClick={() => setSelectedItem(item)} className={`min-h-24 rounded-lg border p-2 flex flex-col items-center justify-center gap-1 ${selectedItem?.name === item.name ? "border-[#D4AF37] bg-[#D4AF37]/10 ring-1 ring-[#D4AF37]" : "border-gray-200 hover:border-[#D4AF37]"}`}>{item.sprite ? <img src={item.sprite} alt="" className="w-10 h-10 object-contain" /> : <Package className="w-9 h-9 text-gray-300" />}<span className="font-lato text-xs capitalize text-center leading-tight">{item.displayName}</span></button>)}</div>
+                <div className="mt-5 flex items-end gap-4"><label className="font-lato text-sm text-gray-600 w-28">Quantità<Input type="number" min="1" max="999" value={itemQuantity} onChange={(e) => setItemQuantity(e.target.value)} className="mt-1" /></label>{selectedItem && <div className="flex-1 flex items-center gap-2"><img src={selectedItem.sprite} alt="" className="w-10 h-10 object-contain" /><span className="font-cinzel text-sm capitalize">{selectedItem.displayName}</span></div>}</div>
+                <Button type="submit" disabled={loading || !selectedItem} className="btn-academy w-full mt-6">{loading ? "Assegnazione..." : `Assegna a ${selectedItemUsers.length} allenatori`}</Button>
               </section>
             </form>
           </TabsContent>

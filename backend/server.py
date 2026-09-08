@@ -100,6 +100,10 @@ class InventoryQuantityUpdate(BaseModel):
 class ActiveTeamUpdate(BaseModel):
     pokemon_ids: List[str] = Field(max_length=3)
 
+class AdminInventoryAssign(InventoryItemAdd):
+    user_ids: List[str] = Field(min_length=1)
+    quantity: int = Field(default=1, ge=1, le=999)
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -783,6 +787,26 @@ async def assign_medal_admin(medal_data: MedalAssign, admin: dict = Depends(get_
     } for user_id in user_ids]
     await db.user_medals.insert_many(documents)
     return {"assigned": len(documents)}
+
+@api_router.post("/admin/inventory")
+async def assign_inventory_admin(item_data: AdminInventoryAssign, admin: dict = Depends(get_admin_user)):
+    user_ids = list(dict.fromkeys(item_data.user_ids))
+    existing_users = await db.users.count_documents({"id": {"$in": user_ids}})
+    if existing_users != len(user_ids):
+        raise HTTPException(status_code=404, detail="Uno o più allenatori non esistono")
+    for user_id in user_ids:
+        existing = await db.user_inventory.find_one({"user_id": user_id, "name": item_data.name}, {"_id": 0})
+        if existing:
+            quantity = min(999, existing.get("quantity", 0) + item_data.quantity)
+            await db.user_inventory.update_one({"id": existing["id"]}, {"$set": {"quantity": quantity}})
+        else:
+            await db.user_inventory.insert_one({
+                "id": str(uuid.uuid4()), "user_id": user_id,
+                "name": item_data.name, "display_name": item_data.display_name,
+                "sprite": item_data.sprite, "quantity": item_data.quantity,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+    return {"assigned": len(user_ids)}
 
 @api_router.get("/admin/users/{user_id}/pokemon")
 async def get_user_pokemon_admin(user_id: str, admin: dict = Depends(get_admin_user)):
