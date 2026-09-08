@@ -26,10 +26,12 @@ export default function InventoryPage() {
     if (catalog.length) return;
     setCatalogLoading(true);
     try {
-      const cached = sessionStorage.getItem("pokemon-held-items-it");
+      const cached = sessionStorage.getItem("pokemon-items-complete-v2");
       if (cached) { setCatalog(JSON.parse(cached)); return; }
-      const { data } = await axios.get("https://pokeapi.co/api/v2/item-attribute/5");
-      setCatalog((data.items || []).map((item) => ({ name: item.name, displayName: item.name.replaceAll("-", " "), sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png` })));
+      const { data } = await axios.get("https://pokeapi.co/api/v2/item?limit=3000");
+      const completeCatalog = (data.results || []).map((item) => ({ name: item.name, displayName: item.name.replaceAll("-", " "), sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.name}.png` }));
+      setCatalog(completeCatalog);
+      sessionStorage.setItem("pokemon-items-complete-v2", JSON.stringify(completeCatalog));
     } catch { toast.error("Impossibile caricare il catalogo strumenti"); }
     finally { setCatalogLoading(false); }
   };
@@ -71,7 +73,7 @@ export default function InventoryPage() {
     </main>
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent className="max-w-2xl bg-[#FDFBF7] border-[#D4AF37]"><DialogHeader><DialogTitle className="font-cinzel text-[#2C3E50]">Aggiungi uno strumento</DialogTitle><DialogDescription>Scegli dalla lista lo strumento da inserire nello zaino.</DialogDescription></DialogHeader>
       <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca uno strumento..." className="pl-10" /></div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">{catalogLoading ? <p className="col-span-full py-10 text-center">Caricamento strumenti...</p> : filteredCatalog.map((item) => <button key={item.name} onClick={() => addItem(item)} className="bg-white border border-gray-200 hover:border-[#D4AF37] rounded-lg p-3 flex flex-col items-center gap-2 text-center"><img src={item.sprite} alt="" className="w-12 h-12 object-contain" /><span className="font-lato text-sm capitalize">{item.displayName}</span></button>)}</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto p-1">{catalogLoading ? <p className="col-span-full py-10 text-center">Caricamento strumenti...</p> : filteredCatalog.map((item) => <button key={item.name} onClick={() => addItem(item)} className="min-h-28 bg-white border border-gray-200 hover:border-[#D4AF37] rounded-lg p-3 flex flex-col items-center justify-center gap-2 text-center"><img src={item.sprite} alt="" className="w-12 h-12 shrink-0 object-contain" /><span className="block min-h-5 font-lato text-sm leading-tight capitalize text-[#2C3E50]">{item.displayName}</span></button>)}</div>
     </DialogContent></Dialog>
   </div>;
 }

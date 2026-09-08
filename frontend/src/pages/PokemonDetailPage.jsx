@@ -385,59 +385,26 @@ export default function PokemonDetailPage() {
 
   const fetchItems = async () => {
     try {
-      const cachedItems = sessionStorage.getItem("pokemon-held-items-it");
+      const cachedItems = sessionStorage.getItem("pokemon-items-complete-v2");
       if (cachedItems) {
         setItems(JSON.parse(cachedItems));
         return;
       }
 
       // L'attributo 5 di PokéAPI contiene gli strumenti assegnabili.
-      const response = await axios.get("https://pokeapi.co/api/v2/item-attribute/5");
-      const itemResources = response.data.items || [];
+      const response = await axios.get("https://pokeapi.co/api/v2/item?limit=3000");
+      const itemResources = response.data.results || [];
       const basicItems = itemResources.map(resource => ({
         name: resource.name,
         displayName: resource.name.replaceAll("-", " "),
-        sprite: null,
+        sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${resource.name}.png`,
         url: resource.url,
         translated: false
       }));
       setItems(basicItems);
       setItemsLoading(false);
+      sessionStorage.setItem("pokemon-items-complete-v2", JSON.stringify(basicItems));
 
-      let nextIndex = 0;
-      const translatedItems = [];
-
-      // Un piccolo pool evita centinaia di richieste simultanee.
-      const workers = Array.from({ length: 10 }, async () => {
-        while (nextIndex < itemResources.length) {
-          const resource = itemResources[nextIndex++];
-          try {
-            const detail = (await axios.get(resource.url)).data;
-            translatedItems.push({
-              name: detail.name,
-              displayName: detail.names.find(entry => entry.language.name === "it")?.name
-                || detail.names.find(entry => entry.language.name === "en")?.name
-                || detail.name.replaceAll("-", " "),
-              sprite: detail.sprites?.default || null,
-              url: resource.url,
-              translated: true
-            });
-          } catch {
-            translatedItems.push({
-              name: resource.name,
-              displayName: resource.name.replaceAll("-", " "),
-              sprite: null,
-              url: resource.url,
-              translated: false
-            });
-          }
-        }
-      });
-
-      await Promise.all(workers);
-      translatedItems.sort((a, b) => a.displayName.localeCompare(b.displayName, "it"));
-      setItems(translatedItems);
-      sessionStorage.setItem("pokemon-held-items-it", JSON.stringify(translatedItems));
     } catch (error) {
       console.error(error);
       toast.error("Errore nel caricamento degli strumenti");
