@@ -4,10 +4,15 @@ Load route bodies without application startup so these tests also run with
 the standard library alone. Deployment integration is outside this suite.
 """
 import ast
+import asyncio
+import io
+import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
+from urllib.request import Request
 
 
 class HTTPException(Exception):
@@ -18,19 +23,31 @@ class HTTPException(Exception):
 
 def load_routes(db):
     tree = ast.parse((Path(__file__).parents[1] / "server.py").read_text(encoding="utf-8"))
-    names = {"evolution_options", "evolve_pokemon", "get_evolutions", "set_admin_inventory"}
+    names = {"fetch_pokeapi", "evolution_options", "evolve_pokemon", "get_evolutions", "set_admin_inventory"}
     functions = [node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name in names]
     for node in functions:
         node.decorator_list = []
         node.args.defaults = []
         for argument in node.args.args:
             argument.annotation = None
-    namespace = {"db": db, "HTTPException": HTTPException}
+    namespace = {"db": db, "HTTPException": HTTPException, "asyncio": asyncio,
+                 "json": json, "Request": Request, "logger": logging.getLogger(__name__)}
     exec(compile(ast.Module(body=functions, type_ignores=[]), "server.py", "exec"), namespace)
     return namespace
 
 
 class InventoryEvolutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_pokeapi_request_uses_explicit_headers(self):
+        routes = load_routes(SimpleNamespace())
+        opener = Mock(return_value=io.BytesIO(b'{"id": 25}'))
+        routes["urlopen"] = opener
+        self.assertEqual(await routes["fetch_pokeapi"]("pokemon/25"), {"id": 25})
+        request = opener.call_args.args[0]
+        self.assertEqual(request.full_url, "https://pokeapi.co/api/v2/pokemon/25/")
+        self.assertEqual(request.get_header("Accept"), "application/json")
+        self.assertTrue(request.get_header("User-agent").startswith("PokemonAcademy/"))
+        self.assertEqual(opener.call_args.kwargs["timeout"], 15)
+
     def setUp(self):
         self.collection = SimpleNamespace(find_one=AsyncMock(), update_one=AsyncMock(), delete_one=AsyncMock())
         self.routes = load_routes(SimpleNamespace(user_pokemon=self.collection, user_inventory=self.collection))

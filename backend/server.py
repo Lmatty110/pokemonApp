@@ -7,7 +7,7 @@ import os
 import logging
 import asyncio
 import json
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
@@ -765,11 +765,19 @@ async def update_my_pokemon(pokemon_id: int, update_data: PokemonUpdate, current
 
 async def fetch_pokeapi(resource: str):
     def fetch():
-        with urlopen(f"https://pokeapi.co/api/v2/{resource}", timeout=15) as response:
+        request = Request(
+            f"https://pokeapi.co/api/v2/{resource.strip('/')}/",
+            headers={
+                "User-Agent": "PokemonAcademy/1.0 (Pokemon evolution lookup)",
+                "Accept": "application/json",
+            },
+        )
+        with urlopen(request, timeout=15) as response:
             return json.load(response)
     try:
         return await asyncio.to_thread(fetch)
     except Exception as exc:
+        logger.warning("PokeAPI request failed for %s: %s", resource, exc)
         raise HTTPException(status_code=503, detail="Dati evoluzione non disponibili. Riprova tra poco.") from exc
 
 
