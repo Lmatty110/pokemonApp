@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
+import AdminInventory from "../components/AdminInventory";
 import { 
   ArrowLeft, 
   Plus, 
@@ -75,6 +76,7 @@ export default function AdminPage() {
   const [itemSearch, setItemSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemQuantity, setItemQuantity] = useState(1);
+  const [inventoryRevision, setInventoryRevision] = useState(0);
   const [itemsLoading, setItemsLoading] = useState(false);
   
   // Pokemon assignment states
@@ -403,6 +405,7 @@ export default function AdminPage() {
         display_name: selectedItem.displayName, sprite: selectedItem.sprite,
         quantity: Number(itemQuantity),
       }, { headers: { Authorization: `Bearer ${token}` } });
+      setInventoryRevision(value => value + 1);
       toast.success(`Strumento assegnato a ${data.assigned} allenatori`);
       setSelectedItemUsers([]); setSelectedItem(null); setItemSearch(""); setItemQuantity(1);
     } catch (error) { toast.error(error.response?.data?.detail || "Errore durante l'assegnazione"); }
@@ -946,6 +949,7 @@ export default function AdminPage() {
                 <Button type="submit" disabled={loading || !selectedItem} className="btn-academy w-full mt-6">{loading ? "Assegnazione..." : `Assegna a ${selectedItemUsers.length} allenatori`}</Button>
               </section>
             </form>
+            <AdminInventory users={users} token={token} revision={inventoryRevision} />
           </TabsContent>
         </Tabs>
       </main>

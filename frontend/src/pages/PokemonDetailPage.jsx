@@ -4,6 +4,7 @@ import { useAuth } from "../App";
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
+import PokemonEvolution from "../components/PokemonEvolution";
 import {
   ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc,
   GraduationCap, Info, Edit2, Check, X, Search, Save, Trash2, Package
@@ -349,6 +350,11 @@ const LearnedMovesPanel = ({
 };
 
 export default function PokemonDetailPage() {
+  const { pokemonId } = useParams();
+  return <PokemonDetail key={pokemonId} />;
+}
+
+function PokemonDetail() {
   const [pokemon, setPokemon] = useState(null);
   const [species, setSpecies] = useState(null);
   const [levelMoves, setLevelMoves] = useState([]);
@@ -804,6 +810,8 @@ export default function PokemonDetailPage() {
                   className="w-40 h-40 object-contain"
                 />
               </div>
+              <PokemonEvolution pokemonId={pokemonId} owned={Boolean(userPokemonData?.id)}
+                disabled={isEditingLevel || savingMoves || savingItem || JSON.stringify(learnedMoves) !== JSON.stringify(normalizeLearnedMoves(userPokemonData?.learned_moves)) || selectedItemName !== (userPokemonData?.held_item?.name || "")} />
             </div>
 
             <div className="text-center sm:text-left flex-1">

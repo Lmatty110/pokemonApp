@@ -6,6 +6,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import asyncio
+import json
+from urllib.request import urlopen
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
@@ -96,6 +98,12 @@ class InventoryItemAdd(BaseModel):
 
 class InventoryQuantityUpdate(BaseModel):
     delta: int = Field(ge=-1, le=1)
+
+class AdminInventoryQuantity(BaseModel):
+    quantity: int = Field(strict=True, ge=0, le=999)
+
+class PokemonEvolution(BaseModel):
+    pokemon_id: int = Field(strict=True, ge=1)
 
 class ActiveTeamUpdate(BaseModel):
     pokemon_ids: List[str] = Field(max_length=3)
@@ -754,6 +762,84 @@ async def update_my_pokemon(pokemon_id: int, update_data: PokemonUpdate, current
         {"_id": 0}
     )
     return updated
+
+async def fetch_pokeapi(resource: str):
+    def fetch():
+        with urlopen(f"https://pokeapi.co/api/v2/{resource}", timeout=15) as response:
+            return json.load(response)
+    try:
+        return await asyncio.to_thread(fetch)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Dati evoluzione non disponibili. Riprova tra poco.") from exc
+
+
+async def evolution_options(pokemon_id: int):
+    pokemon = await fetch_pokeapi(f"pokemon/{pokemon_id}")
+    species_id = pokemon["species"]["url"].rstrip("/").split("/")[-1]
+    species = await fetch_pokeapi(f"pokemon-species/{species_id}")
+    if not species.get("evolution_chain"):
+        return []
+    chain_id = species["evolution_chain"]["url"].rstrip("/").split("/")[-1]
+    chain = await fetch_pokeapi(f"evolution-chain/{chain_id}")
+    def find(node):
+        if node["species"]["name"] == species["name"]:
+            return [{"pokemon_id": int(child["species"]["url"].rstrip("/").split("/")[-1]),
+                     "pokemon_name": child["species"]["name"]} for child in node["evolves_to"]]
+        for child in node["evolves_to"]:
+            found = find(child)
+            if found is not None:
+                return found
+        return None
+    return find(chain["chain"]) or []
+
+
+@api_router.get("/pokemon/my/{pokemon_id}/evolutions")
+async def get_evolutions(pokemon_id: int, current_user: dict = Depends(get_current_user)):
+    owned = await db.user_pokemon.find_one({"user_id": current_user["id"], "pokemon_id": pokemon_id})
+    if not owned:
+        raise HTTPException(status_code=404, detail="Pokemon non trovato")
+    return await evolution_options(pokemon_id)
+
+
+@api_router.post("/pokemon/my/{pokemon_id}/evolve")
+async def evolve_pokemon(pokemon_id: int, evolution: PokemonEvolution, current_user: dict = Depends(get_current_user)):
+    query = {"user_id": current_user["id"], "pokemon_id": pokemon_id}
+    owned = await db.user_pokemon.find_one(query, {"_id": 0})
+    if not owned:
+        raise HTTPException(status_code=404, detail="Pokemon non trovato")
+    options = await evolution_options(pokemon_id)
+    target = next((option for option in options if option["pokemon_id"] == evolution.pokemon_id), None)
+    if not target:
+        raise HTTPException(status_code=400, detail="Evoluzione non valida per questo Pokemon")
+    existing = await db.user_pokemon.find_one({"user_id": current_user["id"], "pokemon_id": evolution.pokemon_id})
+    if existing:
+        raise HTTPException(status_code=409, detail="Possiedi già questo stadio evolutivo: gestiscilo con l'admin prima di evolvere.")
+    result = await db.user_pokemon.update_one({**query, "id": owned["id"]}, {"$set": target})
+    if not result.matched_count:
+        raise HTTPException(status_code=409, detail="Il Pokemon è cambiato. Ricarica la pagina.")
+    return await db.user_pokemon.find_one({"id": owned["id"]}, {"_id": 0})
+
+
+@api_router.get("/admin/users/{user_id}/inventory")
+async def get_admin_inventory(user_id: str, admin: dict = Depends(get_admin_user)):
+    if not await db.users.find_one({"id": user_id}):
+        raise HTTPException(status_code=404, detail="Allenatore non trovato")
+    return await db.user_inventory.find({"user_id": user_id}, {"_id": 0}).sort("display_name", 1).to_list(None)
+
+
+@api_router.patch("/admin/users/{user_id}/inventory/{item_name}")
+async def set_admin_inventory(user_id: str, item_name: str, update: AdminInventoryQuantity, admin: dict = Depends(get_admin_user)):
+    query = {"user_id": user_id, "name": item_name}
+    if update.quantity == 0:
+        result = await db.user_inventory.delete_one(query)
+        if not result.deleted_count:
+            raise HTTPException(status_code=404, detail="Strumento non trovato")
+        return {"removed": True}
+    result = await db.user_inventory.update_one(query, {"$set": {"quantity": update.quantity}})
+    if not result.matched_count:
+        raise HTTPException(status_code=404, detail="Strumento non trovato")
+    return await db.user_inventory.find_one(query, {"_id": 0})
+
 
 @api_router.get("/admin/users")
 async def get_all_users(admin: dict = Depends(get_admin_user)):
