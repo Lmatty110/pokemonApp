@@ -170,12 +170,14 @@ class HeldItem(BaseModel):
     sprite: Optional[str] = None
 
 class PokemonUpdate(BaseModel):
+    ability: Optional[str] = Field(default=None, min_length=1, max_length=100)
     nickname: Optional[str] = None
     level: Optional[int] = None
     learned_moves: Optional[List[Optional[LearnedMove]]] = None
     held_item: Optional[HeldItem] = None
 
 class UserPokemon(BaseModel):
+    ability: Optional[str] = None
     id: str
     user_id: str
     pokemon_id: int
@@ -746,6 +748,14 @@ async def update_my_pokemon(pokemon_id: int, update_data: PokemonUpdate, current
             update_data.held_item.model_dump() if update_data.held_item else None
         )
     
+    if "ability" in update_data.model_fields_set:
+        if update_data.ability is not None:
+            pokemon_data = await fetch_pokeapi(f"pokemon/{pokemon_id}")
+            available = {entry["ability"]["name"] for entry in pokemon_data.get("abilities", [])}
+            if update_data.ability not in available:
+                raise HTTPException(status_code=400, detail="Abilità non disponibile per questo Pokémon")
+        update_fields["ability"] = update_data.ability
+
     if not update_fields:
         raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
     
@@ -772,13 +782,14 @@ async def fetch_pokeapi(resource: str):
                 "Accept": "application/json",
             },
         )
+
         with urlopen(request, timeout=15) as response:
             return json.load(response)
     try:
         return await asyncio.to_thread(fetch)
     except Exception as exc:
         logger.warning("PokeAPI request failed for %s: %s", resource, exc)
-        raise HTTPException(status_code=503, detail="Dati evoluzione non disponibili. Riprova tra poco.") from exc
+        raise HTTPException(status_code=503, detail="Dati Pokémon non disponibili. Riprova tra poco.") from exc
 
 
 async def evolution_options(pokemon_id: int):
@@ -822,6 +833,10 @@ async def evolve_pokemon(pokemon_id: int, evolution: PokemonEvolution, current_u
     existing = await db.user_pokemon.find_one({"user_id": current_user["id"], "pokemon_id": evolution.pokemon_id})
     if existing:
         raise HTTPException(status_code=409, detail="Possiedi già questo stadio evolutivo: gestiscilo con l'admin prima di evolvere.")
+    if owned.get("ability"):
+        evolved = await fetch_pokeapi(f"pokemon/{evolution.pokemon_id}")
+        if owned["ability"] not in {entry["ability"]["name"] for entry in evolved.get("abilities", [])}:
+            target = {**target, "ability": None}
     result = await db.user_pokemon.update_one({**query, "id": owned["id"]}, {"$set": target})
     if not result.matched_count:
         raise HTTPException(status_code=409, detail="Il Pokemon è cambiato. Ricarica la pagina.")

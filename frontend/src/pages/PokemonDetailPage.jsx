@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
 import PokemonEvolution from "../components/PokemonEvolution";
+import PokemonAbility from "../components/PokemonAbility";
 import {
   ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc,
   GraduationCap, Info, Edit2, Check, X, Search, Save, Trash2, Package
@@ -369,6 +370,7 @@ function PokemonDetail() {
   const [items, setItems] = useState([]);
   const [selectedItemName, setSelectedItemName] = useState("");
   const [savingItem, setSavingItem] = useState(false);
+  const [abilityBusy, setAbilityBusy] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
   const [isItemMenuOpen, setIsItemMenuOpen] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(true);
@@ -462,14 +464,22 @@ function PokemonDetail() {
         if (!selected) throw new Error("Strumento non valido");
         let itemToSave = selected;
         if (!selected.translated) {
-          const detail = (await axios.get(selected.url)).data;
-          itemToSave = {
-            ...selected,
-            displayName: detail.names.find(entry => entry.language.name === "it")?.name
-              || detail.names.find(entry => entry.language.name === "en")?.name
-              || detail.name.replaceAll("-", " "),
-            sprite: detail.sprites?.default || null
-          };
+          try {
+            const detail = (await axios.get(
+              `https://pokeapi.co/api/v2/item/${encodeURIComponent(selected.name)}/`,
+              { timeout: 10000 }
+            )).data;
+            itemToSave = {
+              ...selected,
+              displayName: detail.names?.find(entry => entry.language.name === "it")?.name
+                || detail.names?.find(entry => entry.language.name === "en")?.name
+                || selected.displayName,
+              sprite: detail.sprites?.default || selected.sprite
+            };
+          } catch (error) {
+            // I dettagli tradotti sono facoltativi: il catalogo basta per assegnare lo strumento.
+            console.warn("Dettagli strumento non disponibili", error);
+          }
         }
         heldItem = {
           name: itemToSave.name,
@@ -811,7 +821,7 @@ function PokemonDetail() {
                 />
               </div>
               <PokemonEvolution pokemonId={pokemonId} owned={Boolean(userPokemonData?.id)}
-                disabled={isEditingLevel || savingMoves || savingItem || JSON.stringify(learnedMoves) !== JSON.stringify(normalizeLearnedMoves(userPokemonData?.learned_moves)) || selectedItemName !== (userPokemonData?.held_item?.name || "")} />
+                disabled={abilityBusy || isEditingLevel || savingMoves || savingItem || JSON.stringify(learnedMoves) !== JSON.stringify(normalizeLearnedMoves(userPokemonData?.learned_moves)) || selectedItemName !== (userPokemonData?.held_item?.name || "")} />
             </div>
 
             <div className="text-center sm:text-left flex-1">
@@ -924,6 +934,11 @@ function PokemonDetail() {
                   </div>
                 )}
               </div>
+
+              {userPokemonData?.id && <div className="mb-3">
+                <PokemonAbility pokemon={pokemon} savedAbility={userPokemonData.ability} token={token}
+                  onSaved={setUserPokemonData} onBusyChange={setAbilityBusy} />
+              </div>}
 
               <div className="flex gap-2 justify-center sm:justify-start">
                 {pokemon.types.map(t => (

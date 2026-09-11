@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ArrowLeft, Backpack, Minus, Package, Plus, Search } from "lucide-react";
+import { ArrowLeft, Backpack, Map, Minus, Package, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
@@ -14,6 +14,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [mapError, setMapError] = useState(false);
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
@@ -62,8 +63,26 @@ export default function InventoryPage() {
   return <div className="min-h-screen bg-[#FDFBF7]">
     <header className="bg-[#2C3E50] shadow-lg"><div className="max-w-7xl mx-auto px-4 py-4"><button onClick={() => navigate("/dashboard")} className="flex items-center gap-2 text-white hover:text-[#D4AF37]"><ArrowLeft className="w-5 h-5" /> Torna alla Bacheca</button></div></header>
     <main className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between gap-4 mb-8"><div><h1 className="font-cinzel text-3xl text-[#2C3E50] flex items-center gap-3"><Backpack className="text-[#D4AF37]" /> Zaino</h1><p className="font-lato text-gray-500 mt-2">Tutti gli strumenti in tuo possesso</p></div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8"><div><h1 className="font-cinzel text-3xl text-[#2C3E50] flex items-center gap-3"><Backpack className="text-[#D4AF37]" /> Zaino</h1><p className="font-lato text-gray-500 mt-2">Tutti gli strumenti in tuo possesso</p></div>
+        <div className="flex items-center gap-3">
+          <Dialog onOpenChange={() => setMapError(false)}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-[#D4AF37] text-[#2C3E50] hover:bg-[#D4AF37]/10 font-cinzel" data-testid="open-map">
+                <Map className="w-4 h-4 mr-2" /> Mappa
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-[96vw] max-w-7xl max-h-[94dvh] overflow-y-auto rounded-lg border-[#D4AF37] bg-[#FDFBF7] p-3 sm:p-5 shadow-2xl">
+              <DialogHeader className="pr-8">
+                <DialogTitle className="font-cinzel text-[#2C3E50]">Mappa</DialogTitle>
+                <DialogDescription className="sr-only">Mappa del mondo: isole, castelli, foreste e montagne.</DialogDescription>
+              </DialogHeader>
+              {mapError ? <p role="alert" className="py-12 text-center font-lato text-gray-500">La mappa non è disponibile al momento.</p> :
+                <img src={`${process.env.PUBLIC_URL}/mappa.png`} alt="Mappa del mondo con isole, castelli, foreste, montagne e un vulcano"
+                  className="block w-full max-h-[78dvh] object-contain rounded-sm" onError={() => setMapError(true)} />}
+            </DialogContent>
+          </Dialog>
         <Button onClick={loadCatalog} className="w-12 h-12 rounded-full bg-[#D4AF37] hover:bg-[#b89425] text-white p-0" aria-label="Aggiungi strumento"><Plus className="w-7 h-7" /></Button>
+        </div>
       </div>
       {inventory.length ? <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5">{inventory.map((item) => <article key={item.id} className="aspect-square bg-white gold-border rounded-lg shadow-sm p-3 flex flex-col items-center justify-between">
         <h2 className="font-cinzel text-sm text-center text-[#2C3E50] line-clamp-2">{item.display_name}</h2>

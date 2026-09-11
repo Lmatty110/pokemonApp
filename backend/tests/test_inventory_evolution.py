@@ -23,7 +23,7 @@ class HTTPException(Exception):
 
 def load_routes(db):
     tree = ast.parse((Path(__file__).parents[1] / "server.py").read_text(encoding="utf-8"))
-    names = {"fetch_pokeapi", "evolution_options", "evolve_pokemon", "get_evolutions", "set_admin_inventory"}
+    names = {"fetch_pokeapi", "evolution_options", "evolve_pokemon", "get_evolutions", "set_admin_inventory", "update_my_pokemon"}
     functions = [node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name in names]
     for node in functions:
         node.decorator_list = []
@@ -95,6 +95,44 @@ class InventoryEvolutionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as error:
             await self.routes["set_admin_inventory"]("trainer", "potion", SimpleNamespace(quantity=1), {})
         self.assertEqual(error.exception.status_code, 404)
+
+    async def test_ability_assignment_and_removal(self):
+        self.routes["fetch_pokeapi"] = AsyncMock(return_value={"abilities": [
+            {"ability": {"name": "static"}, "is_hidden": False},
+            {"ability": {"name": "lightning-rod"}, "is_hidden": True}]})
+        self.collection.update_one.return_value = SimpleNamespace(matched_count=1)
+        for ability in ["static", "lightning-rod", None]:
+            update = SimpleNamespace(nickname=None, level=None, learned_moves=None,
+                                     model_fields_set={"ability"}, ability=ability)
+            await self.routes["update_my_pokemon"](25, update, {"id": "trainer"})
+            self.collection.update_one.assert_awaited_with(
+                {"user_id": "trainer", "pokemon_id": 25}, {"$set": {"ability": ability}})
+        self.assertEqual(self.routes["fetch_pokeapi"].await_count, 2)
+
+    async def test_incompatible_ability_cannot_be_saved(self):
+        self.routes["fetch_pokeapi"] = AsyncMock(return_value={"abilities": []})
+        update = SimpleNamespace(nickname=None, level=None, learned_moves=None,
+                                 model_fields_set={"ability"}, ability="overgrow")
+        with self.assertRaises(HTTPException) as error:
+            await self.routes["update_my_pokemon"](25, update, {"id": "trainer"})
+        self.assertEqual(error.exception.status_code, 400)
+        self.collection.update_one.assert_not_awaited()
+
+    async def test_other_updates_leave_ability_unchanged(self):
+        self.routes["fetch_pokeapi"] = AsyncMock()
+        self.collection.update_one.return_value = SimpleNamespace(matched_count=1)
+        update = SimpleNamespace(nickname="Spark", level=None, learned_moves=None,
+                                 model_fields_set={"nickname"}, ability=None)
+        await self.routes["update_my_pokemon"](25, update, {"id": "trainer"})
+        self.assertEqual(self.collection.update_one.call_args.args[1], {"$set": {"nickname": "Spark"}})
+        self.routes["fetch_pokeapi"].assert_not_awaited()
+
+    async def test_evolution_clears_incompatible_ability(self):
+        self.collection.find_one.side_effect = [{"id": "record", "ability": "static"}, None, {}]
+        self.collection.update_one.return_value = SimpleNamespace(matched_count=1)
+        self.routes["fetch_pokeapi"] = AsyncMock(return_value={"abilities": [{"ability": {"name": "surge-surfer"}}]})
+        await self.routes["evolve_pokemon"](25, SimpleNamespace(pokemon_id=26), {"id": "trainer"})
+        self.assertIsNone(self.collection.update_one.call_args.args[1]["$set"]["ability"])
 
     async def test_only_immediate_evolutions_and_branches(self):
         def node(name, number, children=None):
