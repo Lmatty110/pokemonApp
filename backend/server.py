@@ -1,8 +1,9 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import DuplicateKeyError
 import os
 import logging
 import asyncio
@@ -10,9 +11,10 @@ import json
 from urllib.request import Request, urlopen
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 import uuid
 from datetime import datetime, timezone, timedelta
+import re
 import jwt
 from passlib.context import CryptContext
 import resend
@@ -187,6 +189,22 @@ class UserPokemon(BaseModel):
     held_item: Optional[HeldItem] = None
     assigned_at: str
 
+class DirectConversationCreate(BaseModel):
+    user_id: str = Field(min_length=1)
+
+class GroupConversationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    member_ids: List[str] = Field(default_factory=list, max_length=49)
+
+class ChatMessageCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+
+class GroupMembersAdd(BaseModel):
+    user_ids: List[str] = Field(min_length=1, max_length=49)
+
+class GroupNameUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
 # ============== HELPER FUNCTIONS ==============
 
 
@@ -255,6 +273,85 @@ async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(sec
         raise HTTPException(status_code=401, detail="Token scaduto")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token non valido")
+
+
+class ChatConnectionManager:
+    """Keeps track of WebSocket connections for this application instance."""
+
+    def __init__(self):
+        self.connections: Dict[str, Set[WebSocket]] = {}
+
+    async def connect(self, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.setdefault(user_id, set()).add(websocket)
+
+    def disconnect(self, user_id: str, websocket: WebSocket):
+        sockets = self.connections.get(user_id)
+        if not sockets:
+            return
+        sockets.discard(websocket)
+        if not sockets:
+            self.connections.pop(user_id, None)
+
+    async def send_to_users(self, user_ids: List[str], payload: dict):
+        dead_connections = []
+        for user_id in set(user_ids):
+            for websocket in list(self.connections.get(user_id, set())):
+                try:
+                    await websocket.send_json(payload)
+                except Exception:
+                    dead_connections.append((user_id, websocket))
+        for user_id, websocket in dead_connections:
+            self.disconnect(user_id, websocket)
+
+
+chat_connections = ChatConnectionManager()
+
+
+async def get_chat_conversation(conversation_id: str, user_id: str) -> dict:
+    conversation = await db.chat_conversations.find_one(
+        {"id": conversation_id, "member_ids": user_id}, {"_id": 0}
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversazione non trovata")
+    return conversation
+
+
+async def serialize_chat_conversation(conversation: dict, user_id: str) -> dict:
+    member_ids = conversation.get("member_ids", [])
+    users = await db.users.find(
+        {"id": {"$in": member_ids}}, {"_id": 0, "id": 1, "username": 1}
+    ).to_list(50)
+    members = [
+        {
+            "id": member["id"],
+            "username": member["username"],
+        }
+        for member in users
+    ]
+
+    read_state = await db.chat_reads.find_one(
+        {"conversation_id": conversation["id"], "user_id": user_id}, {"_id": 0}
+    )
+    unread_query = {
+        "conversation_id": conversation["id"],
+        "sender_id": {"$ne": user_id},
+    }
+    if read_state and read_state.get("last_read_at"):
+        unread_query["created_at"] = {"$gt": read_state["last_read_at"]}
+    unread_count = await db.chat_messages.count_documents(unread_query)
+
+    result = {key: value for key, value in conversation.items() if key != "direct_key"}
+    result["members"] = members
+    result["unread_count"] = unread_count
+    if conversation["type"] == "direct":
+        other_user = next((member for member in members if member["id"] != user_id), None)
+        result["display_name"] = other_user["username"] if other_user else "Conversazione"
+        result["image"] = None
+    else:
+        result["display_name"] = conversation.get("name", "Gruppo")
+        result["image"] = None
+    return result
 
 def calculate_profile(answers: List[QuizAnswer]) -> QuizResult:
     """Calculate personality profile based on answers"""
@@ -975,6 +1072,295 @@ async def remove_pokemon_from_user(user_id: str, pokemon_id: int, admin: dict = 
     
     return {"message": "Pokemon rimosso con successo"}
 
+# ============== CHAT ROUTES ==============
+
+@api_router.get("/chat/users")
+async def search_chat_users(
+    search: str = "",
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return public data for registered users that can be added to a chat."""
+    safe_limit = max(1, min(limit, 50))
+    query = {"id": {"$ne": current_user["id"]}}
+    cleaned_search = search.strip()
+    if cleaned_search:
+        query["username"] = {"$regex": re.escape(cleaned_search), "$options": "i"}
+
+    users = await db.users.find(
+        query, {"_id": 0, "id": 1, "username": 1}
+    ).sort("username", 1).to_list(safe_limit)
+    return users
+
+
+@api_router.get("/chat/conversations")
+async def list_chat_conversations(current_user: dict = Depends(get_current_user)):
+    conversations = await db.chat_conversations.find(
+        {"member_ids": current_user["id"]}, {"_id": 0}
+    ).sort("updated_at", -1).to_list(200)
+    return [
+        await serialize_chat_conversation(conversation, current_user["id"])
+        for conversation in conversations
+    ]
+
+
+@api_router.post("/chat/conversations/direct")
+async def create_direct_conversation(
+    data: DirectConversationCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    if data.user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Non puoi avviare una chat con te stesso")
+    target_user = await db.users.find_one(
+        {"id": data.user_id}, {"_id": 0, "id": 1, "username": 1}
+    )
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+
+    member_ids = sorted([current_user["id"], data.user_id])
+    direct_key = ":".join(member_ids)
+    conversation = await db.chat_conversations.find_one(
+        {"direct_key": direct_key}, {"_id": 0}
+    )
+    if not conversation:
+        now = datetime.now(timezone.utc).isoformat()
+        conversation = {
+            "id": str(uuid.uuid4()),
+            "type": "direct",
+            "name": None,
+            "direct_key": direct_key,
+            "member_ids": member_ids,
+            "admins": [],
+            "created_by": current_user["id"],
+            "created_at": now,
+            "updated_at": now,
+            "last_message": None,
+        }
+        try:
+            await db.chat_conversations.insert_one(conversation.copy())
+        except DuplicateKeyError:
+            conversation = await db.chat_conversations.find_one(
+                {"direct_key": direct_key}, {"_id": 0}
+            )
+        await chat_connections.send_to_users(
+            member_ids, {"type": "conversation.created", "conversation_id": conversation["id"]}
+        )
+    return await serialize_chat_conversation(conversation, current_user["id"])
+
+
+@api_router.post("/chat/conversations/group")
+async def create_group_conversation(
+    data: GroupConversationCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    group_name = data.name.strip()
+    if not group_name:
+        raise HTTPException(status_code=400, detail="Inserisci un nome per il gruppo")
+
+    member_ids = list(dict.fromkeys([current_user["id"], *data.member_ids]))
+    if len(member_ids) < 2:
+        raise HTTPException(status_code=400, detail="Seleziona almeno un altro partecipante")
+    if len(member_ids) > 50:
+        raise HTTPException(status_code=400, detail="Un gruppo può avere al massimo 50 partecipanti")
+    existing_count = await db.users.count_documents({"id": {"$in": member_ids}})
+    if existing_count != len(member_ids):
+        raise HTTPException(status_code=404, detail="Uno o più utenti non esistono")
+
+    now = datetime.now(timezone.utc).isoformat()
+    conversation = {
+        "id": str(uuid.uuid4()),
+        "type": "group",
+        "name": group_name,
+        "member_ids": member_ids,
+        "admins": [current_user["id"]],
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_at": now,
+        "last_message": None,
+    }
+    await db.chat_conversations.insert_one(conversation.copy())
+    await chat_connections.send_to_users(
+        member_ids, {"type": "conversation.created", "conversation_id": conversation["id"]}
+    )
+    return await serialize_chat_conversation(conversation, current_user["id"])
+
+
+@api_router.get("/chat/conversations/{conversation_id}/messages")
+async def list_chat_messages(
+    conversation_id: str,
+    before: Optional[str] = None,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user),
+):
+    await get_chat_conversation(conversation_id, current_user["id"])
+    query = {"conversation_id": conversation_id}
+    if before:
+        query["created_at"] = {"$lt": before}
+    messages = await db.chat_messages.find(query, {"_id": 0}).sort("created_at", -1).to_list(
+        max(1, min(limit, 100))
+    )
+    messages.reverse()
+    return messages
+
+
+@api_router.post("/chat/conversations/{conversation_id}/messages")
+async def send_chat_message(
+    conversation_id: str,
+    data: ChatMessageCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    conversation = await get_chat_conversation(conversation_id, current_user["id"])
+    content = data.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Il messaggio non può essere vuoto")
+
+    now = datetime.now(timezone.utc).isoformat()
+    message = {
+        "id": str(uuid.uuid4()),
+        "conversation_id": conversation_id,
+        "sender_id": current_user["id"],
+        "sender_username": current_user["username"],
+        "content": content,
+        "created_at": now,
+    }
+    await db.chat_messages.insert_one(message.copy())
+    last_message = {
+        "id": message["id"],
+        "sender_id": message["sender_id"],
+        "sender_username": message["sender_username"],
+        "content": message["content"],
+        "created_at": now,
+    }
+    await db.chat_conversations.update_one(
+        {"id": conversation_id},
+        {"$set": {"last_message": last_message, "updated_at": now}},
+    )
+    await db.chat_reads.update_one(
+        {"conversation_id": conversation_id, "user_id": current_user["id"]},
+        {"$set": {"last_read_at": now}},
+        upsert=True,
+    )
+    await chat_connections.send_to_users(
+        conversation["member_ids"], {"type": "message.created", "message": message}
+    )
+    return message
+
+
+@api_router.put("/chat/conversations/{conversation_id}/read")
+async def mark_chat_read(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    await get_chat_conversation(conversation_id, current_user["id"])
+    now = datetime.now(timezone.utc).isoformat()
+    await db.chat_reads.update_one(
+        {"conversation_id": conversation_id, "user_id": current_user["id"]},
+        {"$set": {"last_read_at": now}},
+        upsert=True,
+    )
+    return {"last_read_at": now}
+
+
+@api_router.patch("/chat/conversations/{conversation_id}")
+async def rename_group_conversation(
+    conversation_id: str,
+    data: GroupNameUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    conversation = await get_chat_conversation(conversation_id, current_user["id"])
+    if conversation["type"] != "group" or current_user["id"] not in conversation.get("admins", []):
+        raise HTTPException(status_code=403, detail="Solo un amministratore può rinominare il gruppo")
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Il nome del gruppo non può essere vuoto")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.chat_conversations.update_one(
+        {"id": conversation_id}, {"$set": {"name": name, "updated_at": now}}
+    )
+    await chat_connections.send_to_users(
+        conversation["member_ids"], {"type": "conversation.updated", "conversation_id": conversation_id}
+    )
+    conversation["name"] = name
+    conversation["updated_at"] = now
+    return await serialize_chat_conversation(conversation, current_user["id"])
+
+
+@api_router.post("/chat/conversations/{conversation_id}/members")
+async def add_group_members(
+    conversation_id: str,
+    data: GroupMembersAdd,
+    current_user: dict = Depends(get_current_user),
+):
+    conversation = await get_chat_conversation(conversation_id, current_user["id"])
+    if conversation["type"] != "group" or current_user["id"] not in conversation.get("admins", []):
+        raise HTTPException(status_code=403, detail="Solo un amministratore può aggiungere partecipanti")
+    new_ids = [user_id for user_id in dict.fromkeys(data.user_ids) if user_id not in conversation["member_ids"]]
+    if len(conversation["member_ids"]) + len(new_ids) > 50:
+        raise HTTPException(status_code=400, detail="Un gruppo può avere al massimo 50 partecipanti")
+    if new_ids:
+        existing_count = await db.users.count_documents({"id": {"$in": new_ids}})
+        if existing_count != len(new_ids):
+            raise HTTPException(status_code=404, detail="Uno o più utenti non esistono")
+        now = datetime.now(timezone.utc).isoformat()
+        await db.chat_conversations.update_one(
+            {"id": conversation_id},
+            {"$addToSet": {"member_ids": {"$each": new_ids}}, "$set": {"updated_at": now}},
+        )
+        conversation["member_ids"].extend(new_ids)
+        conversation["updated_at"] = now
+        await chat_connections.send_to_users(
+            conversation["member_ids"], {"type": "conversation.updated", "conversation_id": conversation_id}
+        )
+    return await serialize_chat_conversation(conversation, current_user["id"])
+
+
+@api_router.delete("/chat/conversations/{conversation_id}/members/{member_id}")
+async def remove_group_member(
+    conversation_id: str,
+    member_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    conversation = await get_chat_conversation(conversation_id, current_user["id"])
+    if conversation["type"] != "group":
+        raise HTTPException(status_code=400, detail="Operazione disponibile solo per i gruppi")
+    is_self = member_id == current_user["id"]
+    is_admin = current_user["id"] in conversation.get("admins", [])
+    if not is_self and not is_admin:
+        raise HTTPException(status_code=403, detail="Non puoi rimuovere questo partecipante")
+    if member_id not in conversation["member_ids"]:
+        raise HTTPException(status_code=404, detail="Partecipante non trovato")
+    if member_id in conversation.get("admins", []) and len(conversation.get("admins", [])) == 1 and len(conversation["member_ids"]) > 1:
+        raise HTTPException(status_code=400, detail="Nomina un altro amministratore prima di uscire")
+
+    remaining_members = [user_id for user_id in conversation["member_ids"] if user_id != member_id]
+    if not remaining_members:
+        await db.chat_messages.delete_many({"conversation_id": conversation_id})
+        await db.chat_reads.delete_many({"conversation_id": conversation_id})
+        await db.chat_conversations.delete_one({"id": conversation_id})
+    else:
+        await db.chat_conversations.update_one(
+            {"id": conversation_id},
+            {
+                "$pull": {"member_ids": member_id, "admins": member_id},
+                "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
+            },
+        )
+        await db.chat_reads.delete_one({"conversation_id": conversation_id, "user_id": member_id})
+    await chat_connections.send_to_users(
+        conversation["member_ids"], {"type": "conversation.updated", "conversation_id": conversation_id}
+    )
+    return {"removed": True}
+
+
+@api_router.post("/chat/socket-ticket")
+async def create_chat_socket_ticket(current_user: dict = Depends(get_current_user)):
+    ticket = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=1)
+    await db.chat_socket_tickets.insert_one(
+        {"ticket": ticket, "user_id": current_user["id"], "expires_at": expires_at}
+    )
+    return {"ticket": ticket}
+
 # ============== ROOT ROUTE ==============
 
 @api_router.get("/")
@@ -983,6 +1369,32 @@ async def root():
 
 # Include router
 app.include_router(api_router)
+
+
+@app.websocket("/api/chat/ws")
+async def chat_websocket(websocket: WebSocket, ticket: str):
+    ticket_doc = await db.chat_socket_tickets.find_one_and_delete({
+        "ticket": ticket,
+        "expires_at": {"$gt": datetime.now(timezone.utc)},
+    })
+    if not ticket_doc:
+        await websocket.close(code=1008)
+        return
+    user_id = ticket_doc["user_id"]
+    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
+        await websocket.close(code=1008)
+        return
+
+    await chat_connections.connect(user_id, websocket)
+    try:
+        while True:
+            message = await websocket.receive_text()
+            if message == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        chat_connections.disconnect(user_id, websocket)
+    except Exception:
+        chat_connections.disconnect(user_id, websocket)
 
 origins_env = os.environ.get("CORS_ORIGINS")
 
@@ -998,6 +1410,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def create_database_indexes():
+    """MongoDB creates collections automatically; indexes keep chat queries safe and fast."""
+    await db.chat_conversations.create_index("id", unique=True)
+    await db.chat_conversations.create_index("direct_key", unique=True, sparse=True)
+    await db.chat_conversations.create_index([("member_ids", 1), ("updated_at", -1)])
+    await db.chat_messages.create_index("id", unique=True)
+    await db.chat_messages.create_index([("conversation_id", 1), ("created_at", -1)])
+    await db.chat_reads.create_index([("conversation_id", 1), ("user_id", 1)], unique=True)
+    await db.chat_socket_tickets.create_index("expires_at", expireAfterSeconds=0)
 
 
 @app.on_event("shutdown")

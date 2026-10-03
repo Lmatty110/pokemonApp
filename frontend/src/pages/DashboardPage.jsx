@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
-import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack, Plus } from "lucide-react";
+import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack, Plus, MessageCircle } from "lucide-react";
 
 export default function DashboardPage() {
   const [news, setNews] = useState([]);
@@ -119,6 +119,15 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => navigate("/messages")}
+              className="flex items-center gap-2 text-white hover:text-[#D4AF37] transition-colors px-3 py-2 rounded-lg hover:bg-white/10"
+              aria-label="Apri i messaggi"
+            >
+              <MessageCircle className="w-5 h-5 text-[#D4AF37]" />
+              <span className="font-lato text-sm hidden sm:inline">Messaggi</span>
+            </button>
             {/* Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -159,6 +168,14 @@ export default function DashboardPage() {
                 >
                   <Gamepad2 className="w-4 h-4 mr-2 text-[#8E44AD]" />
                   <span className="font-lato">Visualizza Pokémon Posseduti</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="messages-menu-item"
+                  onClick={() => navigate("/messages")}
+                  className="cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2 text-[#D4AF37]" />
+                  <span className="font-lato">Messaggi</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
