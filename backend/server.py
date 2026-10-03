@@ -353,6 +353,34 @@ async def serialize_chat_conversation(conversation: dict, user_id: str) -> dict:
         result["image"] = None
     return result
 
+
+async def get_total_unread_messages(user_id: str) -> int:
+    conversations = await db.chat_conversations.find(
+        {"member_ids": user_id}, {"_id": 0, "id": 1}
+    ).to_list(200)
+    conversation_ids = [conversation["id"] for conversation in conversations]
+    if not conversation_ids:
+        return 0
+
+    read_states = await db.chat_reads.find(
+        {"user_id": user_id, "conversation_id": {"$in": conversation_ids}},
+        {"_id": 0, "conversation_id": 1, "last_read_at": 1},
+    ).to_list(200)
+    last_read_by_conversation = {
+        state["conversation_id"]: state.get("last_read_at") for state in read_states
+    }
+    unread_conditions = []
+    for conversation_id in conversation_ids:
+        condition = {
+            "conversation_id": conversation_id,
+            "sender_id": {"$ne": user_id},
+        }
+        last_read_at = last_read_by_conversation.get(conversation_id)
+        if last_read_at:
+            condition["created_at"] = {"$gt": last_read_at}
+        unread_conditions.append(condition)
+    return await db.chat_messages.count_documents({"$or": unread_conditions})
+
 def calculate_profile(answers: List[QuizAnswer]) -> QuizResult:
     """Calculate personality profile based on answers"""
     
@@ -1073,6 +1101,10 @@ async def remove_pokemon_from_user(user_id: str, pokemon_id: int, admin: dict = 
     return {"message": "Pokemon rimosso con successo"}
 
 # ============== CHAT ROUTES ==============
+
+@api_router.get("/chat/unread-count")
+async def get_chat_unread_count(current_user: dict = Depends(get_current_user)):
+    return {"unread_count": await get_total_unread_messages(current_user["id"])}
 
 @api_router.get("/chat/users")
 async def search_chat_users(
