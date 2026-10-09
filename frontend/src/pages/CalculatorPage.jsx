@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { applyPercentageModifier, ATTACK_BOOSTS, CALCULATOR_STATS, calculateTotalModifier, getStatTier, getTierModifier } from "../lib/damageCalculator";
 
 const TIER_COLORS = ["#E74C3C", "#F39C12", "#3498DB", "#27AE60"];
+const OPTIONAL_PERCENTAGES = [10, 20, 25, 50, 75, 100];
 
 const StatIcon = ({ statKey }) => {
   if (statKey === "defense") return <Shield className="w-5 h-5" />;
@@ -26,6 +27,7 @@ export default function CalculatorPage() {
   const [stab, setStab] = useState(false);
   const [boost, setBoost] = useState(0);
   const [obtainedResult, setObtainedResult] = useState("");
+  const [selectedPercentages, setSelectedPercentages] = useState([]);
 
   useEffect(() => {
     if (!pokemonId) return;
@@ -76,9 +78,14 @@ export default function CalculatorPage() {
       boost,
     });
   }, [boost, selectedOption, stab, values]);
+  const optionalPercentage = useMemo(
+    () => selectedPercentages.reduce((total, percentage) => total + percentage, 0),
+    [selectedPercentages]
+  );
+  const totalPercentage = result ? result.total + optionalPercentage : null;
   const adjustedResult = useMemo(
-    () => result ? applyPercentageModifier(obtainedResult, result.total) : null,
-    [obtainedResult, result]
+    () => totalPercentage !== null ? applyPercentageModifier(obtainedResult, totalPercentage) : null,
+    [obtainedResult, totalPercentage]
   );
 
   const updateValue = (key, value) => {
@@ -89,6 +96,14 @@ export default function CalculatorPage() {
 
   const updateObtainedResult = (value) => {
     if (value === "" || /^\d{1,9}$/.test(value)) setObtainedResult(value);
+  };
+
+  const togglePercentage = (percentage) => {
+    setSelectedPercentages(current => (
+      current.includes(percentage)
+        ? current.filter(value => value !== percentage)
+        : [...current, percentage]
+    ));
   };
 
   return (
@@ -132,8 +147,29 @@ export default function CalculatorPage() {
             <p className="font-lato text-gray-500 mt-4">Caricamento statistiche...</p>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-[1.35fr_0.65fr] gap-6 items-start">
-            <div className="space-y-6">
+          <div className="space-y-6">
+              <section className="bg-white gold-border rounded-lg p-5 sm:p-6 shadow-sm">
+                <h2 className="font-cinzel text-xl text-[#2C3E50]">Valore manuale <span className="font-lato text-sm normal-case text-gray-400">(facoltativo)</span></h2>
+                <p className="font-lato text-sm text-gray-500 mt-1 mb-4">Inserisci il valore ottenuto per applicare la percentuale totale e arrotondare il risultato finale per eccesso.</p>
+                <label htmlFor="obtained-result" className="block max-w-xs">
+                  <span className="block font-lato text-sm font-bold text-[#2C3E50] mb-2">Valore ottenuto</span>
+                  <input
+                    id="obtained-result"
+                    data-testid="calculator-obtained-result"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    step="1"
+                    value={obtainedResult}
+                    onChange={event => updateObtainedResult(event.target.value)}
+                    placeholder="Es. 10"
+                    className="w-full h-11 px-3 rounded-lg border border-gray-300 font-courier outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10"
+                  />
+                </label>
+              </section>
+
+            <div className="grid lg:grid-cols-[1.35fr_0.65fr] gap-6 items-start">
+              <div className="space-y-6">
               <section className="bg-white gold-border rounded-lg p-5 sm:p-6 shadow-sm">
                 <div className="mb-5">
                   <h2 className="font-cinzel text-xl text-[#2C3E50]">1. Statistica del colpo</h2>
@@ -219,23 +255,30 @@ export default function CalculatorPage() {
               </section>
 
               <section className="bg-white gold-border rounded-lg p-5 sm:p-6 shadow-sm">
-                <h2 className="font-cinzel text-xl text-[#2C3E50]">3. Risultato ottenuto <span className="font-lato text-sm normal-case text-gray-400">(facoltativo)</span></h2>
-                <p className="font-lato text-sm text-gray-500 mt-1 mb-4">Inserisci il valore ottenuto per applicare la percentuale totale e arrotondare il risultato finale per eccesso.</p>
-                <label htmlFor="obtained-result" className="block max-w-xs">
-                  <span className="block font-lato text-sm font-bold text-[#2C3E50] mb-2">Valore ottenuto</span>
-                  <input
-                    id="obtained-result"
-                    data-testid="calculator-obtained-result"
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    step="1"
-                    value={obtainedResult}
-                    onChange={event => updateObtainedResult(event.target.value)}
-                    placeholder="Es. 10"
-                    className="w-full h-11 px-3 rounded-lg border border-gray-300 font-courier outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10"
-                  />
-                </label>
+                <h2 className="font-cinzel text-xl text-[#2C3E50]">3. Percentuali aggiuntive <span className="font-lato text-sm normal-case text-gray-400">(facoltative)</span></h2>
+                <p className="font-lato text-sm text-gray-500 mt-1 mb-4">Seleziona uno o più bonus: verranno sommati alla percentuale totale già calcolata.</p>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {OPTIONAL_PERCENTAGES.map(percentage => {
+                    const selected = selectedPercentages.includes(percentage);
+                    return (
+                      <button
+                        key={percentage}
+                        type="button"
+                        aria-pressed={selected}
+                        data-testid={`calculator-extra-${percentage}`}
+                        onClick={() => togglePercentage(percentage)}
+                        className={`min-h-11 rounded-lg border-2 px-2 py-3 font-lato text-sm font-bold transition-colors ${selected ? "border-[#D4AF37] bg-[#FFF9E6] text-[#2C3E50]" : "border-gray-200 text-gray-500 hover:border-[#D4AF37]/60"}`}
+                      >
+                        +{percentage}%
+                      </button>
+                    );
+                  })}
+                </div>
+                {optionalPercentage > 0 && (
+                  <p className="mt-4 font-lato text-sm text-[#8E44AD]">
+                    Bonus aggiuntivo selezionato: <strong className="font-courier">+{optionalPercentage}%</strong>
+                  </p>
+                )}
               </section>
             </div>
 
@@ -253,18 +296,19 @@ export default function CalculatorPage() {
                     <div className="flex justify-between gap-4"><dt>Mod. statistica</dt><dd className="font-courier">{formatPercent(result.statModifier)}</dd></div>
                     <div className="flex justify-between gap-4"><dt>STAB</dt><dd className="font-courier">{formatPercent(result.stabModifier)}</dd></div>
                     <div className="flex justify-between gap-4"><dt>Livello +{boost}</dt><dd className="font-courier">{formatPercent(result.boostModifier)}</dd></div>
+                    <div className="flex justify-between gap-4"><dt>Bonus aggiuntivi</dt><dd className="font-courier">{formatPercent(optionalPercentage)}</dd></div>
                   </dl>
                   <div className="mt-5 pt-5 border-t border-white/20 text-center">
                     <p className="font-lato text-xs uppercase tracking-widest text-[#D4AF37]">Modificatore totale</p>
-                    <p data-testid="calculator-total" className="font-cinzel text-5xl mt-2">{formatPercent(result.total)}</p>
-                    <p className="font-lato text-xs text-white/60 mt-3">Somma di statistica, STAB e livello di Attacco</p>
+                    <p data-testid="calculator-total" className="font-cinzel text-5xl mt-2">{formatPercent(totalPercentage)}</p>
+                    <p className="font-lato text-xs text-white/60 mt-3">Somma di statistica, STAB, livello di Attacco e bonus aggiuntivi</p>
                   </div>
                   {adjustedResult && (
                     <div className="mt-5 pt-5 border-t border-white/20 text-center">
                       <p className="font-lato text-xs uppercase tracking-widest text-[#D4AF37]">Valore finale</p>
                       <p data-testid="calculator-adjusted-result" className="font-cinzel text-5xl mt-2">{adjustedResult.rounded}</p>
                       <p className="font-courier text-xs text-white/60 mt-3">
-                        {obtainedResult} × {((100 + result.total) / 100).toLocaleString("it-IT", { maximumFractionDigits: 2 })} = {adjustedResult.exact.toLocaleString("it-IT", { maximumFractionDigits: 2 })}
+                        {obtainedResult} × {((100 + totalPercentage) / 100).toLocaleString("it-IT", { maximumFractionDigits: 2 })} = {adjustedResult.exact.toLocaleString("it-IT", { maximumFractionDigits: 2 })}
                       </p>
                       <p className="font-lato text-xs text-white/60 mt-1">Arrotondato per eccesso</p>
                     </div>
@@ -272,6 +316,7 @@ export default function CalculatorPage() {
                 </div>
               )}
             </aside>
+            </div>
           </div>
         )}
       </main>
