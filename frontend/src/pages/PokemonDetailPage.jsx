@@ -15,7 +15,7 @@ import useAutoSave from "../hooks/useAutoSave";
 import AutoSaveStatus from "../components/AutoSaveStatus";
 import { changedFields, recoverPendingSave } from "../lib/autoSave";
 import {
-  ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc,
+  ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc, Calculator,
   GraduationCap, Info, X, Search, Trash2, Package
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
@@ -875,6 +875,18 @@ function PokemonDetail() {
                   </span>
                 ))}
               </div>
+
+              <Button
+                type="button"
+                data-testid="open-calculator-btn"
+                onClick={async () => {
+                  if (await autoSave.flush()) navigate(`/calculator?pokemonId=${pokemon.id}`);
+                }}
+                className="mt-4 bg-[#2C3E50] hover:bg-[#8E44AD] text-white font-lato"
+              >
+                <Calculator className="w-4 h-4 mr-2" />
+                Apri nel Calcolatore
+              </Button>
 
               <div className="flex gap-6 mt-4 justify-center sm:justify-start flex-wrap">
                 <div>

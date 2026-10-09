@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
 import useChatUnreadCount from "../hooks/useChatUnreadCount";
-import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack, Plus, MessageCircle } from "lucide-react";
+import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack, Plus, MessageCircle, Calculator } from "lucide-react";
 
 export default function DashboardPage() {
   const [news, setNews] = useState([]);
@@ -188,6 +188,14 @@ export default function DashboardPage() {
                       {unreadMessages > 99 ? "99+" : unreadMessages}
                     </span>
                   )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="calculator-menu-item"
+                  onClick={() => navigate("/calculator")}
+                  className="cursor-pointer"
+                >
+                  <Calculator className="w-4 h-4 mr-2 text-[#8E44AD]" />
+                  <span className="font-lato">Calcolatore</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
