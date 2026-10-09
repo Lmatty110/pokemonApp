@@ -1,4 +1,4 @@
-import { calculateTotalModifier, getStatTier, getTierModifier } from "./damageCalculator";
+import { applyPercentageModifier, calculateTotalModifier, getStatTier, getTierModifier } from "./damageCalculator";
 
 describe("damageCalculator", () => {
   test.each([
@@ -20,5 +20,12 @@ describe("damageCalculator", () => {
       boostModifier: 50,
       total: 80,
     });
+  });
+
+  test("applica la percentuale al risultato e arrotonda per eccesso", () => {
+    expect(applyPercentageModifier(10, 35)).toEqual({ exact: 13.5, rounded: 14 });
+    expect(applyPercentageModifier(6, 20).exact).toBeCloseTo(7.2);
+    expect(applyPercentageModifier(6, 20).rounded).toBe(8);
+    expect(applyPercentageModifier(10, -20)).toEqual({ exact: 8, rounded: 8 });
   });
 });

@@ -42,3 +42,13 @@ export const calculateTotalModifier = ({ value, kind, stab, boost }) => {
     total: statModifier + stabModifier + boostModifier,
   };
 };
+
+export const applyPercentageModifier = (value, percentage) => {
+  if (value === "" || value === null || value === undefined) return null;
+  const numericValue = Number(value);
+  const numericPercentage = Number(percentage);
+  if (!Number.isFinite(numericValue) || numericValue < 0 || !Number.isFinite(numericPercentage)) return null;
+
+  const exact = numericValue * (1 + numericPercentage / 100);
+  return { exact, rounded: Math.ceil(exact) };
+};

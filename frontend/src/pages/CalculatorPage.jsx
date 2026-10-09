@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { ArrowLeft, Calculator, Check, Shield, Sparkles, Swords, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { ATTACK_BOOSTS, CALCULATOR_STATS, calculateTotalModifier, getStatTier, getTierModifier } from "../lib/damageCalculator";
+import { applyPercentageModifier, ATTACK_BOOSTS, CALCULATOR_STATS, calculateTotalModifier, getStatTier, getTierModifier } from "../lib/damageCalculator";
 
 const TIER_COLORS = ["#E74C3C", "#F39C12", "#3498DB", "#27AE60"];
 
@@ -25,6 +25,7 @@ export default function CalculatorPage() {
   const [selectedStat, setSelectedStat] = useState("");
   const [stab, setStab] = useState(false);
   const [boost, setBoost] = useState(0);
+  const [obtainedResult, setObtainedResult] = useState("");
 
   useEffect(() => {
     if (!pokemonId) return;
@@ -75,11 +76,19 @@ export default function CalculatorPage() {
       boost,
     });
   }, [boost, selectedOption, stab, values]);
+  const adjustedResult = useMemo(
+    () => result ? applyPercentageModifier(obtainedResult, result.total) : null,
+    [obtainedResult, result]
+  );
 
   const updateValue = (key, value) => {
     if (value === "" || (/^\d{1,3}$/.test(value) && Number(value) <= 255)) {
       setValues(current => ({ ...current, [key]: value }));
     }
+  };
+
+  const updateObtainedResult = (value) => {
+    if (value === "" || /^\d{1,9}$/.test(value)) setObtainedResult(value);
   };
 
   return (
@@ -208,6 +217,26 @@ export default function CalculatorPage() {
                   </div>
                 </div>
               </section>
+
+              <section className="bg-white gold-border rounded-lg p-5 sm:p-6 shadow-sm">
+                <h2 className="font-cinzel text-xl text-[#2C3E50]">3. Risultato ottenuto <span className="font-lato text-sm normal-case text-gray-400">(facoltativo)</span></h2>
+                <p className="font-lato text-sm text-gray-500 mt-1 mb-4">Inserisci il valore ottenuto per applicare la percentuale totale e arrotondare il risultato finale per eccesso.</p>
+                <label htmlFor="obtained-result" className="block max-w-xs">
+                  <span className="block font-lato text-sm font-bold text-[#2C3E50] mb-2">Valore ottenuto</span>
+                  <input
+                    id="obtained-result"
+                    data-testid="calculator-obtained-result"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    step="1"
+                    value={obtainedResult}
+                    onChange={event => updateObtainedResult(event.target.value)}
+                    placeholder="Es. 10"
+                    className="w-full h-11 px-3 rounded-lg border border-gray-300 font-courier outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10"
+                  />
+                </label>
+              </section>
             </div>
 
             <aside className="lg:sticky lg:top-6 bg-[#2C3E50] text-white rounded-lg p-6 shadow-xl border border-[#D4AF37]">
@@ -230,6 +259,16 @@ export default function CalculatorPage() {
                     <p data-testid="calculator-total" className="font-cinzel text-5xl mt-2">{formatPercent(result.total)}</p>
                     <p className="font-lato text-xs text-white/60 mt-3">Somma di statistica, STAB e livello di Attacco</p>
                   </div>
+                  {adjustedResult && (
+                    <div className="mt-5 pt-5 border-t border-white/20 text-center">
+                      <p className="font-lato text-xs uppercase tracking-widest text-[#D4AF37]">Valore finale</p>
+                      <p data-testid="calculator-adjusted-result" className="font-cinzel text-5xl mt-2">{adjustedResult.rounded}</p>
+                      <p className="font-courier text-xs text-white/60 mt-3">
+                        {obtainedResult} × {((100 + result.total) / 100).toLocaleString("it-IT", { maximumFractionDigits: 2 })} = {adjustedResult.exact.toLocaleString("it-IT", { maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="font-lato text-xs text-white/60 mt-1">Arrotondato per eccesso</p>
+                    </div>
+                  )}
                 </div>
               )}
             </aside>
