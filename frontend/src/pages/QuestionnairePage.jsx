@@ -197,7 +197,7 @@ export default function QuestionnairePage() {
       <div className="min-h-screen bg-[#FDFBF7] py-8 px-4">
         <div className="max-w-5xl mx-auto">
           {/* Confirmation Card */}
-          <div className="questionnaire-bg p-8 relative animate-fade-in">
+          <div className="questionnaire-bg p-4 sm:p-8 relative animate-fade-in">
             {/* Pokeball Top */}
             <div className="absolute -top-8 left-1/2 -translate-x-1/2">
               <div className="pokeball"></div>
@@ -265,7 +265,7 @@ export default function QuestionnairePage() {
 
       {/* Questionnaire Container */}
       <div className="max-w-5xl mx-auto">
-        <div className="questionnaire-bg p-8 relative">
+        <div className="questionnaire-bg p-4 sm:p-8 relative">
           {/* Pokeball Top */}
           <div className="absolute -top-8 left-1/2 -translate-x-1/2">
             <div className="pokeball"></div>

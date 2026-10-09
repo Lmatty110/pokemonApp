@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth, API } from "../App";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -20,6 +20,7 @@ export default function AuthPage() {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const handleChange = (e) => {
@@ -43,7 +44,8 @@ export default function AuthPage() {
       
       login(response.data.access_token, response.data.user);
       toast.success(isLogin ? "Benvenuto nell'Accademia!" : "Registrazione completata!");
-      navigate("/dashboard");
+      const destination = location.state?.from;
+      navigate(typeof destination === "string" && destination.startsWith("/") && !destination.startsWith("//") ? destination : "/dashboard", { replace: true });
     } catch (error) {
       const errorMessage = error.response?.data?.detail || "Errore durante l'autenticazione";
       toast.error(errorMessage);
@@ -70,7 +72,7 @@ export default function AuthPage() {
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
           {/* Card */}
-          <div className="bg-white gold-border shadow-lg p-8 animate-fade-in">
+          <div className="bg-white gold-border shadow-lg p-4 sm:p-8 animate-fade-in">
             {/* Logo */}
             <div className="flex justify-center mb-6">
               <div className="pokeball"></div>

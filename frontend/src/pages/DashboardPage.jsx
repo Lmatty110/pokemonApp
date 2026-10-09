@@ -79,8 +79,8 @@ export default function DashboardPage() {
   // Check if user has completed the questionnaire
   const hasCompletedQuiz = quizHistory.length > 0;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.success("Arrivederci, allenatore!");
     navigate("/");
   };
@@ -115,12 +115,12 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="bg-[#2C3E50] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="pokeball scale-50"></div>
-            <h1 className="font-cinzel text-xl text-white">Accademia Pokémon</h1>
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+            <div className="hidden sm:block shrink-0"><div className="pokeball scale-50"></div></div>
+            <h1 className="font-cinzel text-base sm:text-xl text-white">Accademia Pokémon</h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-4">
             <button
               type="button"
               onClick={() => navigate("/messages")}
@@ -219,26 +219,28 @@ export default function DashboardPage() {
             Consulta le ultime novità dall'Accademia
           </p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/my-pokemon#active-team")}
-            className="w-full sm:w-auto min-w-64 rounded-lg border border-[#D4AF37]/70 bg-white px-4 py-3 shadow-sm hover:shadow-md hover:border-[#D4AF37] transition-all text-left"
-            aria-label="Apri la Squadra Attiva"
+          <section
+            className="w-full sm:w-auto sm:min-w-64 rounded-lg border border-[#D4AF37]/70 bg-white px-4 py-3 shadow-sm text-left"
+            aria-label="Squadra Attiva"
           >
             <div className="flex items-center justify-between gap-4 mb-2">
-              <span className="font-cinzel text-sm text-[#2C3E50]">Squadra Attiva</span>
+              <button type="button" onClick={() => navigate("/my-pokemon#active-team")} className="font-cinzel text-sm text-[#2C3E50] hover:text-[#8E44AD]">Squadra Attiva</button>
               <span className="font-courier text-xs text-[#8E44AD]">{activeTeam.length}/3</span>
             </div>
             <div className="flex items-center gap-2">
               {Array.from({ length: 3 }, (_, index) => {
                 const member = activeTeam[index];
-                return <span key={member?.id || index} className="w-14 h-14 rounded-full border-2 border-[#D4AF37]/60 bg-[#FDFBF7] flex items-center justify-center overflow-hidden">
+                return <button type="button" key={member?.id || index}
+                  onClick={() => navigate(member ? `/pokemon/${member.pokemon_id}` : "/my-pokemon#active-team")}
+                  aria-label={member ? `Apri ${member.nickname || member.pokemon_name}` : "Aggiungi un Pokémon alla squadra"}
+                  title={member?.nickname || member?.pokemon_name || "Aggiungi Pokémon"}
+                  className="w-14 h-14 shrink-0 rounded-full border-2 border-[#D4AF37]/60 bg-[#FDFBF7] flex items-center justify-center overflow-hidden hover:border-[#8E44AD] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E44AD]">
                   {member ? <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${member.pokemon_id}.png`} alt={member.nickname || member.pokemon_name} className="w-full h-full object-contain" /> : <Plus className="w-5 h-5 text-gray-300" />}
-                </span>;
+                </button>;
               })}
-              <ChevronRight className="w-5 h-5 ml-auto text-[#D4AF37]" />
+              <button type="button" onClick={() => navigate("/my-pokemon#active-team")} aria-label="Gestisci la squadra attiva" className="ml-auto flex items-center justify-center text-[#D4AF37]"><ChevronRight className="w-5 h-5" /></button>
             </div>
-          </button>
+          </section>
         </div>
 
         {unreadMessages > 0 && (

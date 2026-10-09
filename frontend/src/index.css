@@ -20,9 +20,7 @@ body {
     background-color: var(--parchment-cream);
     /* PWA optimizations */
     -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
+    overflow-wrap: anywhere;
     overscroll-behavior: none;
 }
 
@@ -38,13 +36,53 @@ input, textarea, .selectable {
 }
 
 .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 /* Improve touch targets */
 button, a, [role="button"] {
     min-height: 44px;
     min-width: 44px;
+    touch-action: manipulation;
+}
+
+#root, main, section, article {
+    min-width: 0;
+}
+
+.min-h-screen {
+    min-height: 100dvh;
+}
+
+@media (max-width: 639px) {
+    input:not([type="checkbox"]):not([type="radio"]), select, select[class], textarea:not(.profile-stat-input) {
+        font-size: 16px;
+    }
+
+    .btn-academy {
+        min-height: 44px;
+        height: auto;
+        padding: 12px 16px;
+        letter-spacing: 0.05em;
+        white-space: normal;
+    }
+
+    .hero-bg {
+        background-attachment: scroll;
+    }
+
+    .admin-page .gold-border {
+        padding: 16px;
+    }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 /* Prevent pull-to-refresh on mobile */

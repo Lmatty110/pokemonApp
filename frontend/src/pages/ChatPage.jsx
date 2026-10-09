@@ -329,7 +329,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen min-h-[600px] bg-[#FDFBF7] flex flex-col overflow-hidden">
+    <div className="h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-0 bg-[#FDFBF7] flex flex-col overflow-hidden">
       <header className="bg-[#2C3E50] shadow-lg shrink-0">
         <div className="max-w-7xl w-full mx-auto px-4 py-3 flex items-center justify-between">
           <button

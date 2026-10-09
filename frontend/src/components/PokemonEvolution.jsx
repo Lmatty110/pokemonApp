@@ -40,6 +40,6 @@ export default function PokemonEvolution({ pokemonId, owned, disabled }) {
       {options.map(option => <option key={option.pokemon_id} value={option.pokemon_id}>{option.pokemon_name}</option>)}
     </select>}
     <Button className="btn-academy" onClick={evolve} disabled={busy || disabled}>{busy ? "Evoluzione..." : "Evolvi"}</Button>
-    {disabled && <p className="text-xs text-gray-500 text-center">Salva le modifiche prima di evolvere.</p>}
+    {disabled && <p className="text-xs text-gray-500 text-center">Attendi il salvataggio automatico delle modifiche prima di evolvere.</p>}
   </div>;
 }

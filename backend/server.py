@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -9,8 +9,11 @@ import logging
 import asyncio
 import json
 from urllib.request import Request, urlopen
+from urllib.parse import urlparse
+import base64
 from pathlib import Path
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
+from pywebpush import webpush, WebPushException
 from typing import Dict, List, Optional, Set
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -32,6 +35,11 @@ db = client[os.environ['DB_NAME']]
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
 RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL', 'aquilareale.mz@gmail.com')
+
+# Use one persistent VAPID key pair for all devices and backend instances.
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_SUBJECT = os.environ.get('VAPID_SUBJECT', '')
 
 # JWT settings
 JWT_SECRET = os.environ.get('JWT_SECRET', 'pokemon-academy-secret-key-2024')
@@ -132,12 +140,59 @@ class NewsItem(BaseModel):
     is_active: bool = True
     created_at: str
     size: str = "normal"  # normal, large, hero
+    notification_requested: bool = False
 
 class NewsCreate(BaseModel):
     title: str
     description: str
     news_type: str
     size: str = "normal"
+    send_notification: bool = False
+
+class NewsVisibilityUpdate(BaseModel):
+    is_active: bool
+
+def validate_push_endpoint(endpoint: str) -> str:
+    """Only contact browser push services, never arbitrary user-provided URLs."""
+    parsed = urlparse(endpoint)
+    host = parsed.hostname or ""
+    allowed = (host == "fcm.googleapis.com"
+               or host == "updates.push.services.mozilla.com"
+               or host == "web.push.apple.com" or host.endswith(".push.apple.com")
+               or host.endswith(".notify.windows.com"))
+    if (parsed.scheme != "https" or not allowed or parsed.port not in (None, 443)
+            or parsed.username or parsed.password or parsed.fragment):
+        raise ValueError("Endpoint del servizio push non valido")
+    return endpoint
+
+class PushKeys(BaseModel):
+    p256dh: str = Field(min_length=1, max_length=200)
+    auth: str = Field(min_length=1, max_length=100)
+
+    @field_validator("p256dh", "auth")
+    @classmethod
+    def validate_key(cls, value, info):
+        try:
+            raw = base64.b64decode(value + "=" * (-len(value) % 4), altchars=b"-_", validate=True)
+        except (ValueError, base64.binascii.Error) as error:
+            raise ValueError("Chiave push non valida") from error
+        if len(raw) != (65 if info.field_name == "p256dh" else 16):
+            raise ValueError("Lunghezza chiave push non valida")
+        if info.field_name == "p256dh" and raw[0] != 4:
+            raise ValueError("Chiave pubblica push non valida")
+        return value
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=2048)
+    keys: PushKeys
+
+    @field_validator("endpoint")
+    @classmethod
+    def validate_endpoint(cls, value):
+        return validate_push_endpoint(value)
+
+class PushSubscriptionDelete(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=2048)
 
 class QuizAnswer(BaseModel):
     question_number: int
@@ -173,10 +228,11 @@ class HeldItem(BaseModel):
 
 class PokemonUpdate(BaseModel):
     ability: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    nickname: Optional[str] = None
-    level: Optional[int] = None
+    nickname: Optional[str] = Field(default=None, max_length=50)
+    level: Optional[int] = Field(default=None, strict=True, ge=1, le=100)
     learned_moves: Optional[List[Optional[LearnedMove]]] = None
     held_item: Optional[HeldItem] = None
+    notes: Optional[str] = Field(default=None, max_length=5000)
 
 class UserPokemon(BaseModel):
     ability: Optional[str] = None
@@ -188,6 +244,7 @@ class UserPokemon(BaseModel):
     level: Optional[int] = None
     held_item: Optional[HeldItem] = None
     assigned_at: str
+    notes: str = ""
 
 class DirectConversationCreate(BaseModel):
     user_id: str = Field(min_length=1)
@@ -595,7 +652,7 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
 async def update_profile(profile_data: ProfileUpdate, current_user: dict = Depends(get_current_user)):
     if profile_data.profile_image and len(profile_data.profile_image) > 3_000_000:
         raise HTTPException(status_code=413, detail="Immagine profilo troppo grande")
-    values = profile_data.model_dump()
+    values = profile_data.model_dump(exclude_unset=True)
     values["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.user_profiles.update_one(
         {"user_id": current_user["id"]},
@@ -661,12 +718,14 @@ async def admin_login(credentials: UserLogin):
 @api_router.get("/admin/news", response_model=List[NewsItem])
 async def get_all_news_admin(admin: dict = Depends(get_admin_user)):
     """Get all news including inactive ones for admin"""
-    news = await db.news.find({}, {"_id": 0}).to_list(100)
+    news = await db.news.find({}, {"_id": 0}).sort([("created_at", -1), ("id", -1)]).to_list(100)
     return news
 
 @api_router.post("/admin/news", response_model=NewsItem)
-async def create_news_admin(news_data: NewsCreate, admin: dict = Depends(get_admin_user)):
+async def create_news_admin(news_data: NewsCreate, background_tasks: BackgroundTasks, admin: dict = Depends(get_admin_user)):
     """Create news as admin"""
+    if news_data.send_notification and not push_is_configured():
+        raise HTTPException(status_code=503, detail="Notifiche non configurate: imposta le chiavi VAPID sul server oppure disabilita l'invio")
     news_doc = {
         "id": str(uuid.uuid4()),
         "title": news_data.title,
@@ -674,11 +733,21 @@ async def create_news_admin(news_data: NewsCreate, admin: dict = Depends(get_adm
         "news_type": news_data.news_type,
         "is_active": True,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "size": news_data.size
+        "size": news_data.size,
+        "notification_requested": news_data.send_notification
     }
     
     await db.news.insert_one(news_doc)
+    if news_data.send_notification:
+        background_tasks.add_task(send_news_notifications, news_doc)
     return NewsItem(**news_doc)
+
+@api_router.patch("/admin/news/{news_id}/visibility", response_model=NewsItem)
+async def set_news_visibility(news_id: str, visibility: NewsVisibilityUpdate, admin: dict = Depends(get_admin_user)):
+    result = await db.news.update_one({"id": news_id}, {"$set": {"is_active": visibility.is_active}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="News non trovata")
+    return await db.news.find_one({"id": news_id}, {"_id": 0})
 
 @api_router.delete("/admin/news/{news_id}")
 async def delete_news_admin(news_id: str, admin: dict = Depends(get_admin_user)):
@@ -709,12 +778,12 @@ async def update_news_admin(news_id: str, news_data: NewsCreate, admin: dict = D
 
 @api_router.get("/news", response_model=List[NewsItem])
 async def get_news(current_user: dict = Depends(get_current_user)):
-    news = await db.news.find({"is_active": True}, {"_id": 0}).to_list(100)
+    news = await db.news.find({"is_active": True}, {"_id": 0}).sort([("created_at", -1), ("id", -1)]).to_list(100)
     
     # If no news exist, create default questionnaire news
-    if not news:
+    if not news and await db.news.find_one({}, {"_id": 1}) is None:
         default_news = {
-            "id": str(uuid.uuid4()),
+            "id": "default-questionnaire",
             "title": "Questionario sulla Personalità",
             "description": "Scopri quale tipo di allenatore sei! Completa il questionario della Commissione dell'Accademia per ricevere la tua valutazione ufficiale.",
             "news_type": "questionnaire",
@@ -722,25 +791,80 @@ async def get_news(current_user: dict = Depends(get_current_user)):
             "created_at": datetime.now(timezone.utc).isoformat(),
             "size": "hero"
         }
-        await db.news.insert_one(default_news)
-        news = [default_news]
+        await db.news.update_one({"id": default_news["id"]}, {"$setOnInsert": default_news}, upsert=True)
+        news = await db.news.find({"is_active": True}, {"_id": 0}).sort([("created_at", -1), ("id", -1)]).to_list(100)
     
     return news
 
 @api_router.post("/news", response_model=NewsItem)
-async def create_news(news_data: NewsCreate, current_user: dict = Depends(get_current_user)):
-    news_doc = {
-        "id": str(uuid.uuid4()),
-        "title": news_data.title,
-        "description": news_data.description,
-        "news_type": news_data.news_type,
-        "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "size": news_data.size
-    }
-    
-    await db.news.insert_one(news_doc)
-    return NewsItem(**news_doc)
+async def create_news(news_data: NewsCreate, background_tasks: BackgroundTasks, admin: dict = Depends(get_admin_user)):
+    return await create_news_admin(news_data, background_tasks, admin)
+
+# ============== DEVICE PUSH NOTIFICATIONS ==============
+
+def push_is_configured():
+    return bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY and VAPID_SUBJECT)
+
+@api_router.get("/notifications/config")
+async def get_push_config(current_user: dict = Depends(get_current_user)):
+    return {"enabled": push_is_configured(), "public_key": VAPID_PUBLIC_KEY if push_is_configured() else None}
+
+@api_router.post("/notifications/subscriptions")
+async def subscribe_push(subscription: PushSubscriptionCreate, current_user: dict = Depends(get_current_user)):
+    if not push_is_configured():
+        raise HTTPException(status_code=503, detail="Notifiche non ancora configurate")
+    if current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Accedi con un account allenatore per attivare le notifiche")
+    await db.push_subscriptions.update_one(
+        {"endpoint": subscription.endpoint},
+        {"$set": {"user_id": current_user["id"], **subscription.model_dump(),
+                  "updated_at": datetime.now(timezone.utc).isoformat()}}, upsert=True)
+    return {"message": "Notifiche attivate su questo dispositivo"}
+
+@api_router.delete("/notifications/subscriptions")
+async def unsubscribe_push(subscription: PushSubscriptionDelete, current_user: dict = Depends(get_current_user)):
+    await db.push_subscriptions.delete_one({"endpoint": subscription.endpoint, "user_id": current_user["id"]})
+    return {"message": "Notifiche disattivate su questo dispositivo"}
+
+async def send_news_notifications(news_doc):
+    """Deliver in bounded batches without blocking publication or the event loop."""
+    payload = json.dumps({"title": news_doc["title"][:100], "body": news_doc["description"][:180],
+                          "url": f"/news/{news_doc['id']}", "tag": f"news-{news_doc['id']}"}, ensure_ascii=False)
+
+    async def send(subscription):
+        try:
+            # Recheck ownership immediately before delivery (subscriptions can be removed on logout).
+            if not await db.push_subscriptions.find_one(
+                    {"endpoint": subscription["endpoint"], "user_id": subscription["user_id"]}, {"_id": 1}):
+                return
+            if not await db.users.find_one({"id": subscription["user_id"]}, {"_id": 1}):
+                await db.push_subscriptions.delete_one({"endpoint": subscription["endpoint"], "user_id": subscription["user_id"]})
+                return
+            validate_push_endpoint(subscription["endpoint"])
+            await asyncio.to_thread(webpush,
+                subscription_info={"endpoint": subscription["endpoint"], "keys": subscription["keys"]},
+                data=payload, vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_SUBJECT}, ttl=86400, timeout=10)
+        except WebPushException as error:
+            status = error.response.status_code if error.response is not None else None
+            if status in (404, 410):
+                await db.push_subscriptions.delete_one({"endpoint": subscription["endpoint"], "user_id": subscription["user_id"]})
+            else:
+                logger.warning("Invio push fallito (stato %s)", status)
+        except Exception:
+            logger.warning("Impossibile inviare una notifica push")
+
+    try:
+        batch = []
+        async for subscription in db.push_subscriptions.find({}, {"_id": 0}):
+            batch.append(subscription)
+            if len(batch) == 10:
+                await asyncio.gather(*(send(subscription) for subscription in batch))
+                batch = []
+        if batch:
+            await asyncio.gather(*(send(subscription) for subscription in batch))
+    except Exception:
+        logger.exception("Errore durante la distribuzione delle notifiche news")
 
 # ============== QUIZ ROUTES ==============
 
@@ -850,10 +974,13 @@ async def update_my_pokemon(pokemon_id: int, update_data: PokemonUpdate, current
     """Update nickname and level for user's pokemon"""
     update_fields = {}
 
-    if update_data.nickname is not None:
+    if "notes" in update_data.model_fields_set:
+        update_fields["notes"] = update_data.notes or ""
+
+    if "nickname" in update_data.model_fields_set:
         update_fields["nickname"] = update_data.nickname
 
-    if update_data.level is not None:
+    if "level" in update_data.model_fields_set:
         update_fields["level"] = update_data.level
 
     if update_data.learned_moves is not None:
@@ -1454,6 +1581,10 @@ async def create_database_indexes():
     await db.chat_messages.create_index([("conversation_id", 1), ("created_at", -1)])
     await db.chat_reads.create_index([("conversation_id", 1), ("user_id", 1)], unique=True)
     await db.chat_socket_tickets.create_index("expires_at", expireAfterSeconds=0)
+    await db.news.create_index("id", unique=True)
+    await db.news.create_index([("is_active", 1), ("created_at", -1), ("id", -1)])
+    await db.push_subscriptions.create_index("endpoint", unique=True)
+    await db.push_subscriptions.create_index("user_id")
 
 
 @app.on_event("shutdown")

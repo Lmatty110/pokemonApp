@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Coins, Medal, Save, User } from "lucide-react";
+import { ArrowLeft, Camera, Coins, Medal, User } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import NotificationSettings from "../components/NotificationSettings";
+import { useAuth } from "../App";
+import useAutoSave from "../hooks/useAutoSave";
+import AutoSaveStatus from "../components/AutoSaveStatus";
+import { changedFields, recoverPendingSave } from "../lib/autoSave";
 
 const emptyProfile = { username: "", age: "", savings: "", profile_image: null, mind: "", body: "", space: "", luck: "", medals: [] };
 const fields = [
@@ -19,16 +24,43 @@ const formatSavings = (value) => {
   return digits ? digits.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
 };
 
+const profileValues = (profile) => ({
+  age: profile.age === "" || profile.age == null ? null : Number(profile.age),
+  savings: profile.savings, profile_image: profile.profile_image,
+  mind: profile.mind, body: profile.body, space: profile.space, luck: profile.luck,
+});
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState(emptyProfile);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const initialProfile = useRef(null);
   const fileInput = useRef(null);
   const navigate = useNavigate();
+  const { user, token } = useAuth();
+  const resourceKey = `profile:${user?.id}`;
+  const autoSave = useAutoSave({
+    resourceKey, value: profileValues(profile), initialValue: initialProfile.current,
+    enabled: !loading && Boolean(initialProfile.current),
+    save: (value, previous) => api.put("/profile", changedFields(value, previous),
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }),
+  });
 
   useEffect(() => {
-    api.get("/profile").then(({ data }) => setProfile({ ...data, savings: formatSavings(data.savings) })).catch(() => toast.error("Impossibile caricare il profilo")).finally(() => setLoading(false));
-  }, []);
+    let active = true;
+    const load = async () => {
+      try {
+        const pending = await recoverPendingSave(resourceKey);
+        const { data } = await api.get("/profile");
+        if (!active) return;
+        const loaded = { ...emptyProfile, ...data, savings: formatSavings(data.savings) };
+        initialProfile.current = profileValues(loaded);
+        setProfile({ ...loaded, ...pending });
+      } catch { if (active) toast.error("Impossibile caricare il profilo"); }
+      finally { if (active) setLoading(false); }
+    };
+    load();
+    return () => { active = false; };
+  }, [resourceKey]);
 
   const chooseImage = (event) => {
     const file = event.target.files?.[0];
@@ -42,27 +74,15 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   };
 
-  const save = async () => {
-    setSaving(true);
-    try {
-      await api.put("/profile", {
-        age: profile.age === "" ? null : Number(profile.age), savings: profile.savings,
-        profile_image: profile.profile_image,
-        mind: profile.mind, body: profile.body, space: profile.space, luck: profile.luck,
-      });
-      toast.success("Profilo salvato");
-    } catch (error) {
-      toast.error(error.response?.data?.detail || "Errore durante il salvataggio");
-    } finally { setSaving(false); }
-  };
-
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]"><div className="pokeball animate-pulse" /></div>;
+  if (!initialProfile.current) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><p>Impossibile caricare il profilo.</p><Button onClick={() => window.location.reload()}>Riprova</Button></div>;
 
   return <div className="min-h-screen bg-[#FDFBF7]">
     <header className="bg-[#2C3E50] shadow-lg"><div className="max-w-6xl mx-auto px-4 py-4">
-      <button onClick={() => navigate("/dashboard")} className="flex items-center gap-2 text-white hover:text-[#D4AF37]"><ArrowLeft className="w-5 h-5" /> Torna alla Bacheca</button>
+      <button onClick={async () => { if (await autoSave.flush()) navigate("/dashboard"); }} className="flex items-center gap-2 text-white hover:text-[#D4AF37]"><ArrowLeft className="w-5 h-5" /> Torna alla Bacheca</button>
     </div></header>
     <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <AutoSaveStatus state={autoSave} testId="profile-autosave-status" />
       <section className="bg-white gold-border rounded-lg p-6 sm:p-8 shadow-md">
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <div className="shrink-0 text-center">
@@ -91,7 +111,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-2 md:grid-cols-4">
           {fields.map(([key, title, headerColor, bodyColor]) => <div key={key} className="border-r border-b md:border-b-0 last:border-r-0 border-white/70">
             <h2 className={`font-cinzel text-center text-white py-3 ${headerColor}`}>{title}</h2>
-            <textarea value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className={`w-full h-32 p-4 resize-none outline-none font-lato text-4xl leading-relaxed text-center ${bodyColor}`} />
+            <textarea aria-label={title} value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} maxLength={500} placeholder="Scrivi qui..." className={`profile-stat-input w-full h-32 p-4 resize-none outline-none font-lato text-2xl sm:text-4xl leading-relaxed text-center ${bodyColor}`} />
           </div>)}
         </div>
       </section>
@@ -107,7 +127,7 @@ export default function ProfilePage() {
           </div>; })}
         </div>
       </section>
-      <div className="flex justify-end"><Button onClick={save} disabled={saving} className="btn-academy"><Save className="w-4 h-4 mr-2" />{saving ? "Salvataggio..." : "Salva profilo"}</Button></div>
+      <NotificationSettings />
     </main>
   </div>;
 }

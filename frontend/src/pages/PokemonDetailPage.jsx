@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../App";
 import { toast } from "sonner";
@@ -6,13 +6,22 @@ import axios from "axios";
 import api from "../api";
 import PokemonEvolution from "../components/PokemonEvolution";
 import PokemonAbility from "../components/PokemonAbility";
+import LearnableMovesList from "../components/LearnableMovesList";
+import MoveEffectsDialog from "../components/MoveEffectsDialog";
+import { MoveEffectsButton, MovePower, MoveType } from "../components/MoveInfo";
+import { getDamageClassLabel, getTypeColor } from "../lib/moves";
+import { getMoveData } from "../lib/moveData";
+import useAutoSave from "../hooks/useAutoSave";
+import AutoSaveStatus from "../components/AutoSaveStatus";
+import { changedFields, recoverPendingSave } from "../lib/autoSave";
 import {
   ArrowLeft, Zap, Shield, Swords, Heart, Wind, Target, Disc,
-  GraduationCap, Info, Edit2, Check, X, Search, Save, Trash2, Package
+  GraduationCap, Info, X, Search, Trash2, Package
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
+import { Textarea } from "../components/ui/textarea";
 
 // Version groups in order from newest to oldest
 const VERSION_GROUPS = [
@@ -25,22 +34,6 @@ const VERSION_GROUPS = [
   { name: "black-2-white-2", displayName: "Pokémon Nero 2 e Bianco 2" },
   { name: "black-white", displayName: "Pokémon Nero e Bianco" },
 ];
-
-const TYPE_COLORS = {
-  normal: "#A8A878", fire: "#F08030", water: "#6890F0", electric: "#F8D030",
-  grass: "#78C850", ice: "#98D8D8", fighting: "#C03028", poison: "#A040A0",
-  ground: "#E0C068", flying: "#A890F0", psychic: "#F85888", bug: "#A8B820",
-  rock: "#B8A038", ghost: "#705898", dragon: "#7038F8", dark: "#705848",
-  steel: "#B8B8D0", fairy: "#EE99AC"
-};
-
-const getTypeColor = (type) => TYPE_COLORS[type] || "#68A090";
-
-const getDamageClassLabel = (damageClass) => {
-  if (damageClass === "physical") return "Fisico";
-  if (damageClass === "special") return "Speciale";
-  return "Stato";
-};
 
 const getStatIcon = (stat) => {
   switch (stat) {
@@ -120,7 +113,7 @@ const CustomStatsTable = ({ stats }) => {
         Classificazione ufficiale dell'Accademia Pokémon
       </p>
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[420px]">
           <thead>
             <tr className="border-b-2 border-[#D4AF37]/30">
               <th className="text-left py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Statistica</th>
@@ -166,7 +159,7 @@ const TierLegend = () => (
       Bonus e malus applicati in base al Tier (tutte le stats tranne Velocità)
     </p>
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full min-w-[420px]">
         <thead>
           <tr className="border-b-2 border-[#D4AF37]/30">
             <th className="text-center py-3 px-4 font-cinzel text-sm text-[#2C3E50]">Tier</th>
@@ -212,8 +205,8 @@ const LearnedMovesPanel = ({
   setMoveSearches,
   onSelectMove,
   onRemoveMove,
-  onSave,
-  saving
+  autoSave,
+  onShowEffects
 }) => {
   const handleSearchChange = (index, value) => {
     setMoveSearches(prev => ({ ...prev, [index]: value }));
@@ -228,14 +221,7 @@ const LearnedMovesPanel = ({
             Seleziona fino a 4 mosse che il tuo Pokémon ha effettivamente appreso.
           </p>
         </div>
-        <Button
-          onClick={onSave}
-          disabled={saving}
-          className="bg-[#2C3E50] hover:bg-[#34495E] text-white"
-        >
-          <Save className="w-4 h-4 mr-2" />
-          {saving ? "Salvataggio..." : "Salva mosse"}
-        </Button>
+        <AutoSaveStatus state={autoSave} testId="moves-autosave-status" />
       </div>
 
       <div className="mt-6 space-y-4">
@@ -250,32 +236,33 @@ const LearnedMovesPanel = ({
                   {index + 1}
                 </div>
 
-                <div className="flex-1 relative">
+                <div className="flex-1 min-w-0 relative">
                   {move ? (
-                    <div className="flex items-center justify-between gap-3 p-3 border border-[#D4AF37] rounded-lg bg-[#FFFCF3]">
+                    <div data-testid={`learned-move-${index + 1}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 border border-[#D4AF37] rounded-lg bg-[#FFFCF3]">
                       <div className="flex items-center gap-3 min-w-0">
-                        <span
-                          className="w-4 h-4 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: getTypeColor(move.type) }}
-                        />
                         <div className="min-w-0">
-                          <p className="font-lato font-medium text-[#2C3E50] truncate">{move.name}</p>
+                          <p className="font-lato font-medium text-[#2C3E50] break-words">{move.name}</p>
+                          <MoveType type={move.type} />
                           <p className="font-courier text-xs text-gray-400">
                             {getDamageClassLabel(move.damageClass)}
-                            {move.power ? ` · Pot. ${move.power}` : ""}
                             {move.tmNumber ? ` · MT${move.tmNumber}` : ""}
                           </p>
+                          <div className="mt-1 text-xs text-gray-500">Potenza: <MovePower power={move.power} /></div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                      <MoveEffectsButton move={move} onShow={onShowEffects} />
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onRemoveMove(index)}
                         className="text-red-500 hover:bg-red-50 flex-shrink-0"
                         title="Rimuovi mossa"
+                        aria-label={`Rimuovi ${move.name} dallo slot ${index + 1}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -301,28 +288,26 @@ const LearnedMovesPanel = ({
               {!move && search.trim() && moveSearches[index + "_results"]?.length > 0 && (
                 <div className="ml-12 mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-56 overflow-y-auto z-20 relative">
                   {moveSearches[index + "_results"].map((candidate) => (
-                    <button
+                    <div
                       key={`${index}-${candidate.englishName}`}
-                      type="button"
-                      onClick={() => onSelectMove(index, candidate)}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 border-b last:border-b-0 border-gray-100"
+                      data-testid={`move-result-${index + 1}-${candidate.englishName}`}
+                      className="flex flex-wrap items-center gap-2 px-3 py-2 border-b last:border-b-0 border-gray-100"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span
-                          className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: getTypeColor(candidate.type) }}
-                        />
-                        <div className="min-w-0">
-                          <p className="font-lato text-sm text-[#2C3E50] truncate">{candidate.name}</p>
+                      <button type="button" onClick={() => onSelectMove(index, candidate)}
+                        aria-label={`Assegna ${candidate.name} allo slot ${index + 1}`}
+                        className="flex-1 min-w-0 text-left p-1 rounded hover:bg-gray-50">
+                          <p className="font-lato text-sm text-[#2C3E50] break-words">{candidate.name}</p>
+                          <MoveType type={candidate.type} />
                           <p className="font-courier text-[10px] text-gray-400">
                             {getDamageClassLabel(candidate.damageClass)}
                           </p>
-                        </div>
-                      </div>
+                          <MovePower power={candidate.power} />
                       <span className="font-courier text-xs text-gray-400 flex-shrink-0">
-                        {candidate.tmNumber ? `MT${candidate.tmNumber}` : candidate.level != null ? `Lv. ${candidate.level}` : ""}
+                        {candidate.tmNumber ? ` · MT${candidate.tmNumber}` : candidate.level != null ? ` · Lv. ${candidate.level}` : ""}
                       </span>
-                    </button>
+                      </button>
+                      <MoveEffectsButton move={candidate} onShow={onShowEffects} />
+                    </div>
                   ))}
                 </div>
               )}
@@ -352,6 +337,13 @@ const LearnedMovesPanel = ({
 
 export default function PokemonDetailPage() {
   const { pokemonId } = useParams();
+  const { user } = useAuth();
+  // Evolution and direct navigation must not reuse the previous Pokémon's drafts.
+  return <PokemonDetailEditor key={`${user?.id}:${pokemonId}`} />;
+}
+
+function PokemonDetailEditor() {
+  const { pokemonId } = useParams();
   return <PokemonDetail key={pokemonId} />;
 }
 
@@ -365,25 +357,46 @@ function PokemonDetail() {
   const [movesSubTab, setMovesSubTab] = useState("level");
   const [dataSource, setDataSource] = useState(null);
   const [userPokemonData, setUserPokemonData] = useState(null);
-  const [isEditingLevel, setIsEditingLevel] = useState(false);
   const [level, setLevel] = useState("");
+  const [nickname, setNickname] = useState("");
   const [items, setItems] = useState([]);
-  const [selectedItemName, setSelectedItemName] = useState("");
-  const [savingItem, setSavingItem] = useState(false);
-  const [abilityBusy, setAbilityBusy] = useState(false);
+  const [heldItem, setHeldItem] = useState(null);
+  const [ability, setAbility] = useState("");
   const [itemSearch, setItemSearch] = useState("");
   const [isItemMenuOpen, setIsItemMenuOpen] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(true);
   const [movesLoading, setMovesLoading] = useState(true);
+  const [notes, setNotes] = useState("");
+  const [effectsMove, setEffectsMove] = useState(null);
+  const initialPokemon = useRef(null);
 
   // NUOVO: esattamente 4 slot
   const [learnedMoves, setLearnedMoves] = useState([null, null, null, null]);
   const [moveSearches, setMoveSearches] = useState({});
-  const [savingMoves, setSavingMoves] = useState(false);
 
   const { pokemonId } = useParams();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { user, token } = useAuth();
+  const resourceKey = `pokemon:${user?.id}:${pokemonId}`;
+  const autoSave = useAutoSave({
+    resourceKey,
+    enabled: Boolean(userPokemonData?.id && initialPokemon.current),
+    initialValue: initialPokemon.current,
+    value: {
+      nickname: nickname.trim() || null, notes,
+      level: level === "" ? null : /^\d+$/.test(level) && Number.isFinite(Number(level)) ? Number(level) : level,
+      held_item: heldItem, ability: ability || null, learned_moves: learnedMoves,
+    },
+    validate: (value) => {
+      if (value.level !== null && (!Number.isInteger(value.level) || value.level < 1 || value.level > 100)) return "Il livello deve essere un numero intero tra 1 e 100.";
+      const selected = value.learned_moves.filter(Boolean);
+      if (new Set(selected.map(move => move.englishName)).size !== selected.length) return "Non puoi inserire la stessa mossa più volte.";
+      return "";
+    },
+    save: (value, previous) => api.put(`/pokemon/my/${pokemonId}`, changedFields(value, previous),
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 20000 }),
+    onSaved: (_, snapshot) => setUserPokemonData(current => ({ ...current, ...snapshot })),
+  });
 
   useEffect(() => {
     fetchPokemonData();
@@ -430,8 +443,6 @@ function PokemonDetail() {
     ).slice(0, 12);
   }, [items, itemSearch]);
 
-  const selectedItem = items.find(item => item.name === selectedItemName);
-
   // Mantiene i 4 slot e carica ciò che è salvato nel backend.
   const normalizeLearnedMoves = (moves) => {
     const result = Array.isArray(moves) ? moves.slice(0, 4) : [];
@@ -441,118 +452,42 @@ function PokemonDetail() {
 
   const fetchUserPokemonData = async () => {
     try {
+      const pending = await recoverPendingSave(resourceKey);
       const response = await api.get(`/pokemon/my/${pokemonId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       setUserPokemonData(response.data);
-      setSelectedItemName(response.data.held_item?.name || "");
-      setItemSearch(response.data.held_item?.display_name || "");
-      setLevel(response.data.level?.toString() || "");
-      setLearnedMoves(normalizeLearnedMoves(response.data.learned_moves));
+      initialPokemon.current = {
+        nickname: response.data.nickname || null, level: response.data.level ?? null,
+        notes: response.data.notes || "", ability: response.data.ability || null,
+        held_item: response.data.held_item || null, learned_moves: normalizeLearnedMoves(response.data.learned_moves),
+      };
+      const draft = { ...initialPokemon.current, ...pending };
+      setNickname(draft.nickname || "");
+      setNotes(draft.notes);
+      setHeldItem(draft.held_item);
+      setAbility(draft.ability || "");
+      setItemSearch(draft.held_item?.display_name || "");
+      setLevel(draft.level?.toString() || "");
+      setLearnedMoves(draft.learned_moves);
     } catch (error) {
       console.log("Pokemon non assegnato all'utente o errore nel caricamento dati");
     }
   };
 
-  const saveHeldItem = async () => {
-    setSavingItem(true);
+  const selectHeldItem = async (item) => {
+    setHeldItem({ name: item.name, display_name: item.displayName, sprite: item.sprite });
+    setItemSearch(item.displayName);
+    setIsItemMenuOpen(false);
+    if (item.translated) return;
     try {
-      let heldItem = null;
-      if (selectedItemName) {
-        const selected = items.find(item => item.name === selectedItemName);
-        if (!selected) throw new Error("Strumento non valido");
-        let itemToSave = selected;
-        if (!selected.translated) {
-          try {
-            const detail = (await axios.get(
-              `https://pokeapi.co/api/v2/item/${encodeURIComponent(selected.name)}/`,
-              { timeout: 10000 }
-            )).data;
-            itemToSave = {
-              ...selected,
-              displayName: detail.names?.find(entry => entry.language.name === "it")?.name
-                || detail.names?.find(entry => entry.language.name === "en")?.name
-                || selected.displayName,
-              sprite: detail.sprites?.default || selected.sprite
-            };
-          } catch (error) {
-            // I dettagli tradotti sono facoltativi: il catalogo basta per assegnare lo strumento.
-            console.warn("Dettagli strumento non disponibili", error);
-          }
-        }
-        heldItem = {
-          name: itemToSave.name,
-          display_name: itemToSave.displayName,
-          sprite: itemToSave.sprite
-        };
-      }
-      const response = await api.put(`/pokemon/my/${pokemonId}`,
-        { held_item: heldItem },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setUserPokemonData(response.data);
-      toast.success(heldItem ? "Strumento assegnato!" : "Strumento rimosso!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Errore nel salvataggio dello strumento");
-    } finally {
-      setSavingItem(false);
-    }
-  };
-
-  const saveLevel = async () => {
-    const levelNum = parseInt(level);
-    if (level && (isNaN(levelNum) || levelNum < 1 || levelNum > 100)) {
-      toast.error("Il livello deve essere tra 1 e 100");
-      return;
-    }
-
-    try {
-      await api.put(`/pokemon/my/${pokemonId}`,
-        { level: level ? levelNum : null },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setUserPokemonData(prev => ({ ...prev, level: levelNum }));
-      setIsEditingLevel(false);
-      toast.success("Livello salvato!");
-    } catch {
-      toast.error("Errore nel salvataggio del livello");
-    }
-  };
-
-  const saveLearnedMoves = async () => {
-    if (!userPokemonData) {
-      toast.error("Questo Pokémon non è assegnato al tuo account");
-      return;
-    }
-
-    const selected = learnedMoves.filter(Boolean);
-
-    if (selected.length !== new Set(selected.map(move => move.englishName)).size) {
-      toast.error("Non puoi inserire la stessa mossa più volte");
-      return;
-    }
-
-    setSavingMoves(true);
-
-    try {
-      const response = await api.put(
-        `/pokemon/my/${pokemonId}`,
-        { learned_moves: learnedMoves },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setUserPokemonData(response.data);
-      setLearnedMoves(normalizeLearnedMoves(response.data.learned_moves));
-      setMoveSearches({});
-      toast.success("Mosse apprese salvate!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Errore nel salvataggio delle mosse apprese");
-    } finally {
-      setSavingMoves(false);
-    }
+      const { data } = await axios.get(`https://pokeapi.co/api/v2/item/${encodeURIComponent(item.name)}/`, { timeout: 10000 });
+      const displayName = data.names?.find(entry => entry.language.name === "it")?.name
+        || data.names?.find(entry => entry.language.name === "en")?.name || item.displayName;
+      setHeldItem(current => current?.name === item.name ? { ...current, display_name: displayName, sprite: data.sprites?.default || current.sprite } : current);
+      setItemSearch(current => current === item.displayName ? displayName : current);
+    } catch { /* The selected catalog entry remains valid without translated details. */ }
   };
 
   const fetchPokemonData = async () => {
@@ -640,16 +575,16 @@ function PokemonDetail() {
     const moveDetails = await Promise.all(
       moves.map(async (move) => {
         try {
-          const moveRes = await axios.get(move.move.url);
+          const moveData = await getMoveData(move.move.name);
 
           const italianName =
-            moveRes.data.names.find(n => n.language.name === "it")?.name ||
-            moveRes.data.name;
+            moveData.names.find(n => n.language.name === "it")?.name ||
+            moveData.name;
 
           let tmNumber = null;
 
           if (!isLevelUp && versionGroupName) {
-            const versionMachine = moveRes.data.machines.find(
+            const versionMachine = moveData.machines.find(
               m => m.version_group.name === versionGroupName
             );
 
@@ -667,12 +602,12 @@ function PokemonDetail() {
 
           return {
             name: italianName,
-            englishName: moveRes.data.name,
-            type: moveRes.data.type.name,
-            power: moveRes.data.power,
-            accuracy: moveRes.data.accuracy,
-            pp: moveRes.data.pp,
-            damageClass: moveRes.data.damage_class.name,
+            englishName: moveData.name,
+            type: moveData.type.name,
+            power: moveData.power,
+            accuracy: moveData.accuracy,
+            pp: moveData.pp,
+            damageClass: moveData.damage_class.name,
             level: isLevelUp ? move.level : null,
             tmNumber
           };
@@ -794,7 +729,7 @@ function PokemonDetail() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <button
             data-testid="back-to-pokemon-btn"
-            onClick={() => navigate("/my-pokemon")}
+            onClick={async () => { if (await autoSave.flush()) navigate("/my-pokemon"); }}
             className="flex items-center gap-2 text-white hover:opacity-80 transition-opacity"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -821,25 +756,33 @@ function PokemonDetail() {
                 />
               </div>
               <PokemonEvolution pokemonId={pokemonId} owned={Boolean(userPokemonData?.id)}
-                disabled={abilityBusy || isEditingLevel || savingMoves || savingItem || JSON.stringify(learnedMoves) !== JSON.stringify(normalizeLearnedMoves(userPokemonData?.learned_moves)) || selectedItemName !== (userPokemonData?.held_item?.name || "")} />
+                disabled={autoSave.dirty} />
             </div>
 
-            <div className="text-center sm:text-left flex-1">
+            <div className="w-full min-w-0 text-center sm:text-left flex-1">
               <p className="font-courier text-gray-500 mb-1">
                 #{pokemon.id.toString().padStart(3, "0")}
               </p>
 
               <div className="mb-3">
+                <div className="flex flex-wrap items-end justify-center sm:justify-start gap-3">
                 <h1
                   data-testid="pokemon-name"
                   className="font-cinzel text-3xl sm:text-4xl text-[#2C3E50] capitalize"
                 >
                   {getItalianName()}
                 </h1>
+                {userPokemonData?.id && <label htmlFor="pokemon-nickname" className="w-full sm:w-52 text-left">
+                  <span className="block font-courier text-xs text-gray-500 mb-1">Soprannome</span>
+                  <Input id="pokemon-nickname" data-testid="pokemon-nickname" value={nickname} maxLength={50}
+                    onChange={event => setNickname(event.target.value)} placeholder="Aggiungi un soprannome" />
+                </label>}
+                </div>
+                {userPokemonData?.id && <AutoSaveStatus state={autoSave} testId="pokemon-autosave-status" className="mt-3 justify-center sm:justify-start" />}
 
-                {userPokemonData && (
+                {userPokemonData?.id && (
                   <div className="mt-3 flex flex-wrap items-end gap-2 justify-center sm:justify-start">
-                    <div className="relative text-left">
+                    <div className="relative w-full sm:w-auto text-left">
                       <span className="block font-courier text-xs text-gray-400 mb-1">Strumento</span>
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -848,7 +791,6 @@ function PokemonDetail() {
                           value={itemSearch}
                           onChange={(event) => {
                             setItemSearch(event.target.value);
-                            setSelectedItemName("");
                             setIsItemMenuOpen(true);
                           }}
                           onFocus={() => setIsItemMenuOpen(true)}
@@ -856,16 +798,16 @@ function PokemonDetail() {
                           placeholder={itemsLoading ? "Caricamento strumenti..." : "Cerca uno strumento..."}
                           disabled={itemsLoading}
                           autoComplete="off"
-                          className="w-64 h-10 pl-9 pr-9 bg-white border-2 border-[#D4AF37]/30 rounded-lg text-sm font-lato outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10 disabled:bg-gray-50"
+                          className="w-full sm:w-64 h-11 pl-9 pr-9 bg-white border-2 border-[#D4AF37]/30 rounded-lg text-sm font-lato outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10 disabled:bg-gray-50"
                         />
-                        {(itemSearch || selectedItemName) && (
+                        {(itemSearch || heldItem) && (
                           <button
                             type="button"
                             aria-label="Rimuovi strumento"
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => {
                               setItemSearch("");
-                              setSelectedItemName("");
+                              setHeldItem(null);
                               setIsItemMenuOpen(true);
                             }}
                             className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-[#C0392B]"
@@ -876,12 +818,12 @@ function PokemonDetail() {
                       </div>
 
                       {isItemMenuOpen && !itemsLoading && (
-                        <div className="absolute z-30 top-full left-0 mt-1 w-64 max-h-64 overflow-y-auto bg-white border border-[#D4AF37]/40 rounded-lg shadow-xl">
+                        <div className="absolute z-30 top-full left-0 mt-1 w-full sm:w-64 max-h-64 overflow-y-auto bg-white border border-[#D4AF37]/40 rounded-lg shadow-xl">
                           <button
                             type="button"
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => {
-                              setSelectedItemName("");
+                              setHeldItem(null);
                               setItemSearch("");
                               setIsItemMenuOpen(false);
                             }}
@@ -894,11 +836,7 @@ function PokemonDetail() {
                               type="button"
                               key={item.name}
                               onMouseDown={(event) => event.preventDefault()}
-                              onClick={() => {
-                                setSelectedItemName(item.name);
-                                setItemSearch(item.displayName);
-                                setIsItemMenuOpen(false);
-                              }}
+                              onClick={() => selectHeldItem(item)}
                               className="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-[#D4AF37]/10"
                             >
                               {item.sprite ? (
@@ -917,27 +855,13 @@ function PokemonDetail() {
                         </div>
                       )}
                     </div>
-                    <Button
-                      data-testid="save-held-item"
-                      size="sm"
-                      onClick={saveHeldItem}
-                      disabled={savingItem || itemsLoading}
-                      className="h-10 bg-[#D4AF37] hover:bg-[#b8941f] text-white"
-                    >
-                      {savingItem ? "Salvataggio..." : (
-                        <>
-                          <Package className="w-4 h-4 mr-1" />
-                          {selectedItem ? "Assegna" : "Rimuovi"}
-                        </>
-                      )}
-                    </Button>
+                    <p className="w-full font-lato text-xs text-gray-500 text-left">{heldItem ? `Assegnato: ${heldItem.display_name}` : "Nessuno strumento assegnato"}</p>
                   </div>
                 )}
               </div>
 
               {userPokemonData?.id && <div className="mb-3">
-                <PokemonAbility pokemon={pokemon} savedAbility={userPokemonData.ability} token={token}
-                  onSaved={setUserPokemonData} onBusyChange={setAbilityBusy} />
+                <PokemonAbility pokemon={pokemon} selectedAbility={ability} onChange={setAbility} />
               </div>}
 
               <div className="flex gap-2 justify-center sm:justify-start">
@@ -963,43 +887,22 @@ function PokemonDetail() {
                   <p className="font-lato text-[#2C3E50]">{(pokemon.weight / 10).toFixed(1)} kg</p>
                 </div>
 
-                {userPokemonData && (
+                {userPokemonData?.id && (
                   <div>
-                    <p className="font-courier text-xs text-gray-400">Livello</p>
-                    {isEditingLevel ? (
-                      <div className="flex items-center gap-1">
+                    <label htmlFor="pokemon-level" className="block font-courier text-xs text-gray-400 mb-1">Livello</label>
                         <Input
+                          id="pokemon-level"
                           data-testid="level-input"
                           type="number"
                           min="1"
                           max="100"
+                          step="1"
+                          inputMode="numeric"
+                          placeholder="—"
                           value={level}
                           onChange={(e) => setLevel(e.target.value)}
-                          className="w-16 h-7 text-sm text-center"
+                          className="w-20 h-11 text-sm text-center"
                         />
-                        <Button size="sm" variant="ghost" onClick={saveLevel} className="h-7 w-7 p-0 text-green-600">
-                          <Check className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setIsEditingLevel(false);
-                            setLevel(userPokemonData.level?.toString() || "");
-                          }}
-                          className="h-7 w-7 p-0 text-red-600"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <span className="font-lato text-[#2C3E50]">{userPokemonData.level || "—"}</span>
-                        <Button size="sm" variant="ghost" onClick={() => setIsEditingLevel(true)} className="h-6 w-6 p-0 text-gray-400">
-                          <Edit2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -1009,6 +912,17 @@ function PokemonDetail() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4">
+        {userPokemonData?.id && <section className="mb-6 bg-white gold-border rounded-lg p-4 sm:p-6">
+          <label htmlFor="pokemon-notes" className="block font-cinzel text-xl text-[#2C3E50] mb-2">Note</label>
+          <p className="font-lato text-sm text-gray-500 mb-3">Appunti personali su questo Pokémon.</p>
+          <Textarea id="pokemon-notes" data-testid="pokemon-notes" value={notes}
+            onChange={(event) => setNotes(event.target.value)} maxLength={5000}
+            placeholder="Scrivi qui le tue note..." className="min-h-32 resize-y" />
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
+            <span className="font-lato text-xs text-gray-400">{notes.length}/5000</span>
+            <AutoSaveStatus state={autoSave} testId="notes-autosave-status" />
+          </div>
+        </section>}
         {/* TAB PRINCIPALI: aggiunta Mosse Apprese */}
         <div className="flex gap-2 sm:gap-4 border-b border-gray-200 mb-6 overflow-x-auto">
           <button
@@ -1134,35 +1048,7 @@ function PokemonDetail() {
 
             {!movesLoading && movesSubTab === "level" && (
               levelMoves.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-50 rounded-lg font-courier text-xs text-gray-500">
-                    <div className="col-span-2">LIV.</div>
-                    <div className="col-span-4">MOSSA</div>
-                    <div className="col-span-2">TIPO</div>
-                    <div className="col-span-2">POT.</div>
-                    <div className="col-span-2">PREC.</div>
-                  </div>
-
-                  {levelMoves.map((move, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-gray-100 hover:border-[#D4AF37]">
-                      <div className="col-span-2">
-                        <span className="inline-flex items-center justify-center w-10 h-8 bg-[#2C3E50] text-white rounded font-courier text-sm font-bold">
-                          {move.level === 0 ? "—" : move.level}
-                        </span>
-                      </div>
-                      <div className="col-span-4">
-                        <p className="font-lato text-[#2C3E50]">{move.name}</p>
-                        <p className="font-courier text-xs text-gray-400">{getDamageClassLabel(move.damageClass)}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="inline-block w-3 h-3 rounded-full mr-1" style={{ backgroundColor: getTypeColor(move.type) }} />
-                        <span className="font-lato text-xs text-gray-600 hidden sm:inline capitalize">{move.type}</span>
-                      </div>
-                      <div className="col-span-2 font-courier text-sm text-[#C0392B]">{move.power || "—"}</div>
-                      <div className="col-span-2 font-courier text-sm text-gray-500">{move.accuracy ? `${move.accuracy}%` : "—"}</div>
-                    </div>
-                  ))}
-                </div>
+                <LearnableMovesList moves={levelMoves} mode="level" onShowEffects={setEffectsMove} />
               ) : (
                 <p className="text-center py-8 text-gray-500 font-lato">Nessuna mossa per livello trovata</p>
               )
@@ -1170,35 +1056,7 @@ function PokemonDetail() {
 
             {!movesLoading && movesSubTab === "tm" && (
               tmMoves.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-[#8E44AD]/10 rounded-lg font-courier text-xs text-gray-500">
-                    <div className="col-span-2">MT</div>
-                    <div className="col-span-4">MOSSA</div>
-                    <div className="col-span-2">TIPO</div>
-                    <div className="col-span-2">POT.</div>
-                    <div className="col-span-2">PREC.</div>
-                  </div>
-
-                  {tmMoves.map((move, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 rounded-lg border border-gray-100 hover:border-[#8E44AD]">
-                      <div className="col-span-2">
-                        <span className="inline-flex items-center justify-center w-10 h-8 bg-[#8E44AD] text-white rounded font-courier text-xs font-bold">
-                          {move.tmNumber ? move.tmNumber : "MT"}
-                        </span>
-                      </div>
-                      <div className="col-span-4">
-                        <p className="font-lato text-[#2C3E50]">{move.name}</p>
-                        <p className="font-courier text-xs text-gray-400">{getDamageClassLabel(move.damageClass)}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="inline-block w-3 h-3 rounded-full mr-1" style={{ backgroundColor: getTypeColor(move.type) }} />
-                        <span className="font-lato text-xs text-gray-600 hidden sm:inline capitalize">{move.type}</span>
-                      </div>
-                      <div className="col-span-2 font-courier text-sm text-[#C0392B]">{move.power || "—"}</div>
-                      <div className="col-span-2 font-courier text-sm text-gray-500">{move.accuracy ? `${move.accuracy}%` : "—"}</div>
-                    </div>
-                  ))}
-                </div>
+                <LearnableMovesList moves={tmMoves} mode="tm" onShowEffects={setEffectsMove} />
               ) : (
                 <p className="text-center py-8 text-gray-500 font-lato">Nessuna mossa MT trovata</p>
               )
@@ -1207,15 +1065,15 @@ function PokemonDetail() {
         )}
 
         {activeTab === "learnedMoves" && (
-          userPokemonData ? (
+          userPokemonData?.id ? (
             <LearnedMovesPanel
               learnedMoves={learnedMoves}
               moveSearches={moveSearches}
               setMoveSearches={setMoveSearches}
               onSelectMove={selectLearnedMove}
               onRemoveMove={removeLearnedMove}
-              onSave={saveLearnedMoves}
-              saving={savingMoves}
+              autoSave={autoSave}
+              onShowEffects={setEffectsMove}
             />
           ) : (
             <div className="bg-white gold-border rounded-lg p-6 mb-8">
@@ -1229,6 +1087,7 @@ function PokemonDetail() {
           )
         )}
       </div>
+      <MoveEffectsDialog move={effectsMove} onClose={() => setEffectsMove(null)} versionGroup={dataSource?.name} />
     </div>
   );
 }

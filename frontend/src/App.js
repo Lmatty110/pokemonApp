@@ -1,9 +1,10 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useState, useEffect, createContext, useContext } from "react";
 import axios from "axios";
 import api from "./api";
+import { disablePush, syncExistingSubscription } from "./lib/pushNotifications";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -39,6 +40,7 @@ export const AuthProvider = ({ children }) => {
             headers: { Authorization: `Bearer ${token}` }
           });
           setUser(response.data);
+          syncExistingSubscription(token).catch((error) => console.warn("Sincronizzazione notifiche non disponibile", error));
         } catch (error) {
           console.error("Token validation failed:", error);
           localStorage.removeItem("token");
@@ -57,7 +59,9 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try { await disablePush(token); }
+    catch (error) { console.warn("Rimozione iscrizione notifiche non disponibile", error); }
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
@@ -73,6 +77,7 @@ export const AuthProvider = ({ children }) => {
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -86,7 +91,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" replace state={{ from: location.pathname + location.search + location.hash }} />;
   }
 
   return children;
@@ -97,7 +102,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Toaster 
-          position="top-right" 
+          position="top-center"
           richColors 
           toastOptions={{
             style: {

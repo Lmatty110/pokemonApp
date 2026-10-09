@@ -42,6 +42,7 @@ export default function MyPokemonPage() {
 
   const filteredPokemon = pokemon.filter(p => 
     p.pokemon_name.toLowerCase().includes(searchTerm.toLowerCase())
+      || (p.nickname || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getPokemonSprite = (pokemonId) => {
@@ -143,13 +144,13 @@ export default function MyPokemonPage() {
 
         {/* Pokemon Grid */}
         {filteredPokemon.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4">
             {filteredPokemon.map((p, index) => (
               <div
                 key={p.id}
                 data-testid={`pokemon-card-${index}`}
                 onClick={() => navigate(`/pokemon/${p.pokemon_id}`)}
-                className="bg-white gold-border p-4 rounded-lg cursor-pointer hover:shadow-lg transition-shadow animate-fade-in group"
+                className="min-w-0 bg-white gold-border p-2 sm:p-4 rounded-lg cursor-pointer hover:shadow-lg transition-shadow animate-fade-in group"
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <div className="relative">
@@ -179,9 +180,10 @@ export default function MyPokemonPage() {
                     </div>
                   )}
                 </div>
-                <p className="font-cinzel text-center text-[#2C3E50] mt-2 capitalize text-sm">
-                  {p.pokemon_name}
+                <p className="font-cinzel text-center text-[#2C3E50] mt-2 capitalize text-sm break-words">
+                  {p.nickname || p.pokemon_name}
                 </p>
+                {p.nickname && <p className="font-lato text-center text-gray-400 text-xs capitalize">{p.pokemon_name}</p>}
                 <p className="font-courier text-center text-gray-400 text-xs">
                   #{p.pokemon_id.toString().padStart(3, '0')}
                 </p>

@@ -4,6 +4,10 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
+import { Switch } from "../components/ui/switch";
+import useAutoSave from "../hooks/useAutoSave";
+import AutoSaveStatus from "../components/AutoSaveStatus";
+import { recoverPendingSave } from "../lib/autoSave";
 import {
   Select,
   SelectContent,
@@ -66,6 +70,7 @@ export default function AdminPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newsToDelete, setNewsToDelete] = useState(null);
   const [editingNews, setEditingNews] = useState(null);
+  const [newsEditorLoading, setNewsEditorLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("news");
   const [selectedMedalUsers, setSelectedMedalUsers] = useState([]);
   const [medalForm, setMedalForm] = useState({ name: "", image: "" });
@@ -78,6 +83,8 @@ export default function AdminPage() {
   const [itemQuantity, setItemQuantity] = useState(1);
   const [inventoryRevision, setInventoryRevision] = useState(0);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [pushConfigured, setPushConfigured] = useState(false);
+  const [visibilityBusy, setVisibilityBusy] = useState(null);
   
   // Pokemon assignment states
   const [selectedUser, setSelectedUser] = useState(null);
@@ -95,10 +102,22 @@ export default function AdminPage() {
     title: "",
     description: "",
     news_type: "announcement",
-    size: "normal"
+    size: "normal",
+    send_notification: false
   });
 
   const navigate = useNavigate();
+  const newsAutoSave = useAutoSave({
+    resourceKey: `admin-news:${editingNews?.id || "new"}`,
+    enabled: Boolean(editingNews), value: newsForm,
+    initialValue: editingNews ? { title: editingNews.title, description: editingNews.description,
+      news_type: editingNews.news_type, size: editingNews.size, send_notification: false } : null,
+    validate: (value) => !value.title.trim() || !value.description.trim() ? "Titolo e descrizione non possono essere vuoti." : "",
+    save: (value) => api.put(`/admin/news/${editingNews.id}`, value,
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }),
+    onSaved: (_, snapshot) => setNews(current => current.map(item => item.id === editingNews.id
+      ? { ...item, title: snapshot.title, description: snapshot.description, news_type: snapshot.news_type, size: snapshot.size } : item)),
+  });
 
   useEffect(() => {
     if (token) {
@@ -114,6 +133,7 @@ export default function AdminPage() {
       setNews(response.data);
       setIsLoggedIn(true);
       fetchUsers();
+      fetchPushConfig();
     } catch (error) {
       localStorage.removeItem("adminToken");
       setToken(null);
@@ -134,6 +154,7 @@ export default function AdminPage() {
       toast.success("Accesso admin effettuato!");
       fetchNews(newToken);
       fetchUsers(newToken);
+      fetchPushConfig(newToken);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Credenziali non valide");
     } finally {
@@ -141,13 +162,32 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (!await newsAutoSave.flush()) return;
     localStorage.removeItem("adminToken");
     setToken(null);
     setIsLoggedIn(false);
     setNews([]);
     setUsers([]);
     toast.success("Logout effettuato");
+  };
+
+  const fetchPushConfig = async (authToken = token) => {
+    try {
+      const { data } = await api.get("/notifications/config", { headers: { Authorization: `Bearer ${authToken}` } });
+      setPushConfigured(data.enabled);
+    } catch { setPushConfigured(false); }
+  };
+
+  const toggleNewsVisibility = async (item) => {
+    setVisibilityBusy(item.id);
+    try {
+      const { data } = await api.patch(`/admin/news/${item.id}/visibility`, { is_active: !item.is_active },
+        { headers: { Authorization: `Bearer ${token}` } });
+      setNews((current) => current.map((entry) => entry.id === data.id ? data : entry));
+      toast.success(data.is_active ? "News visibile agli utenti" : "News nascosta agli utenti");
+    } catch { toast.error("Impossibile aggiornare la visibilità della news"); }
+    finally { setVisibilityBusy(null); }
   };
 
   const fetchNews = async (authToken = token) => {
@@ -174,42 +214,45 @@ export default function AdminPage() {
 
   const handleCreateNews = async (e) => {
     e.preventDefault();
+    if (newsEditorLoading) return;
+    if (editingNews) { await newsAutoSave.flush(); return; }
     setLoading(true);
     
     try {
-      if (editingNews) {
-        await api.put(`/admin/news/${editingNews.id}`, newsForm, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        toast.success("News aggiornata con successo!");
-      } else {
-        await api.post(`/admin/news`, newsForm, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        toast.success("News creata con successo!");
-      }
+      await api.post(`/admin/news`, newsForm, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success(newsForm.send_notification ? "News creata! Invio notifiche avviato." : "News creata senza notifica.");
       
-      setNewsForm({ title: "", description: "", news_type: "announcement", size: "normal" });
+      setNewsForm({ title: "", description: "", news_type: "announcement", size: "normal", send_notification: false });
       setEditingNews(null);
       fetchNews();
     } catch (error) {
-      toast.error("Errore durante il salvataggio della news");
+      toast.error(error.response?.data?.detail || "Errore durante il salvataggio della news");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditNews = (newsItem) => {
-    setEditingNews(newsItem);
-    setNewsForm({
-      title: newsItem.title,
-      description: newsItem.description,
-      news_type: newsItem.news_type,
-      size: newsItem.size
-    });
+  const handleEditNews = async (newsItem) => {
+    if (newsEditorLoading || editingNews?.id === newsItem.id) return;
+    setNewsEditorLoading(true);
+    try {
+      if (!await newsAutoSave.flush()) return;
+      const pending = await recoverPendingSave(`admin-news:${newsItem.id}`);
+      const { data } = await api.get("/admin/news", { headers: { Authorization: `Bearer ${token}` } });
+      const current = data.find(item => item.id === newsItem.id);
+      if (!current) { toast.error("La news non è più disponibile."); return; }
+      setNews(data);
+      setEditingNews(current);
+      setNewsForm({ title: current.title, description: current.description,
+        news_type: current.news_type, size: current.size, send_notification: false, ...pending });
+    } catch { toast.error("Impossibile aprire la news. Riprova."); }
+    finally { setNewsEditorLoading(false); }
   };
 
-  const handleDeleteClick = (newsItem) => {
+  const handleDeleteClick = async (newsItem) => {
+    if (editingNews?.id === newsItem.id && !await newsAutoSave.flush()) return;
     setNewsToDelete(newsItem);
     setShowDeleteDialog(true);
   };
@@ -222,6 +265,10 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success("News eliminata con successo!");
+      if (editingNews?.id === newsToDelete.id) {
+        setEditingNews(null);
+        setNewsForm({ title: "", description: "", news_type: "announcement", size: "normal", send_notification: false });
+      }
       fetchNews();
     } catch (error) {
       toast.error("Errore durante l'eliminazione");
@@ -231,9 +278,10 @@ export default function AdminPage() {
     }
   };
 
-  const cancelEdit = () => {
+  const cancelEdit = async () => {
+    if (!await newsAutoSave.flush()) return;
     setEditingNews(null);
-    setNewsForm({ title: "", description: "", news_type: "announcement", size: "normal" });
+    setNewsForm({ title: "", description: "", news_type: "announcement", size: "normal", send_notification: false });
   };
 
   const getNewsIcon = (type) => {
@@ -510,7 +558,7 @@ export default function AdminPage() {
 
   // Admin Dashboard
   return (
-    <div className="min-h-screen bg-[#FDFBF7]">
+    <div className="admin-page min-h-screen bg-[#FDFBF7]">
       {/* Header */}
       <header className="bg-[#2C3E50] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -537,19 +585,19 @@ export default function AdminPage() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); if (value === "items") loadItemCatalog(); if (value === "medals") fetchAssignedMedals(); }} className="w-full">
           <TabsList className="grid w-full max-w-4xl grid-cols-2 sm:grid-cols-4 h-auto mb-8">
-            <TabsTrigger value="news" className="font-cinzel">
+            <TabsTrigger value="news" className="font-cinzel text-xs sm:text-sm px-2">
               <Bell className="w-4 h-4 mr-2" />
               Gestione News
             </TabsTrigger>
-            <TabsTrigger value="pokemon" className="font-cinzel">
+            <TabsTrigger value="pokemon" className="font-cinzel text-xs sm:text-sm px-2">
               <Gamepad2 className="w-4 h-4 mr-2" />
               Assegna Pokémon
             </TabsTrigger>
-            <TabsTrigger value="medals" className="font-cinzel">
+            <TabsTrigger value="medals" className="font-cinzel text-xs sm:text-sm px-2">
               <Medal className="w-4 h-4 mr-2" />
               Assegna Medaglie
             </TabsTrigger>
-            <TabsTrigger value="items" className="font-cinzel">
+            <TabsTrigger value="items" className="font-cinzel text-xs sm:text-sm px-2">
               <Backpack className="w-4 h-4 mr-2" />
               Assegna Oggetti
             </TabsTrigger>
@@ -566,7 +614,9 @@ export default function AdminPage() {
                     {editingNews ? "Modifica News" : "Crea Nuova News"}
                   </h2>
 
-                  <form onSubmit={handleCreateNews} className="space-y-4">
+                  {newsEditorLoading && <p role="status" className="text-sm text-gray-500 mb-3">Caricamento news...</p>}
+                  <form onSubmit={handleCreateNews}>
+                    <fieldset disabled={newsEditorLoading} className="space-y-4 min-w-0">
                     <div className="space-y-2">
                       <Label className="font-lato text-[#2C3E50]">Titolo</Label>
                       <Input
@@ -625,7 +675,20 @@ export default function AdminPage() {
                       </Select>
                     </div>
 
-                    <div className="flex gap-2 pt-4">
+                    {!editingNews && <div className="rounded-lg border border-[#D4AF37]/40 bg-[#FDFBF7] p-3">
+                      <Label htmlFor="news-send-notification" className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-lato text-[#2C3E50]">
+                        <span>Invia notifica</span>
+                        <Switch id="news-send-notification" data-testid="news-send-notification" checked={newsForm.send_notification}
+                          onCheckedChange={(checked) => setNewsForm({ ...newsForm, send_notification: checked })}
+                          className="min-h-0 min-w-0" disabled={!pushConfigured || loading} />
+                      </Label>
+                      <p className="font-lato text-xs text-gray-500 mt-2">{pushConfigured
+                        ? "Se attiva, avvisa tutti i dispositivi degli utenti che hanno consentito le notifiche."
+                        : "Per abilitare l'invio configura le chiavi VAPID sul server."}</p>
+                    </div>}
+
+                    <div className="flex flex-wrap gap-2 pt-4">
+                      {editingNews && <AutoSaveStatus state={newsAutoSave} testId="news-autosave-status" className="w-full" />}
                       {editingNews && (
                         <Button
                           type="button"
@@ -633,18 +696,19 @@ export default function AdminPage() {
                           onClick={cancelEdit}
                           className="flex-1 border-[#2C3E50]"
                         >
-                          Annulla
+                          Chiudi modifica
                         </Button>
                       )}
-                      <Button
+                      {!editingNews && <Button
                         data-testid="save-news-btn"
                         type="submit"
                         className="btn-academy flex-1"
                         disabled={loading}
                       >
-                        {loading ? "Salvataggio..." : (editingNews ? "Aggiorna" : "Crea News")}
-                      </Button>
+                        {loading ? "Pubblicazione..." : "Crea News"}
+                      </Button>}
                     </div>
+                    </fieldset>
                   </form>
                 </div>
               </div>
@@ -662,8 +726,8 @@ export default function AdminPage() {
                       data-testid={`admin-news-item-${index}`}
                       className="bg-white border border-gray-200 rounded-sm p-4 hover:border-[#D4AF37] transition-colors"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
+                      <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
                           <div className={`
                             w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
                             ${item.news_type === "questionnaire" ? "bg-[#8E44AD] text-white" : 
@@ -672,12 +736,15 @@ export default function AdminPage() {
                           `}>
                             {getNewsIcon(item.news_type)}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <h3 className="font-cinzel text-lg text-[#2C3E50]">{item.title}</h3>
                             <p className="font-lato text-sm text-gray-600 mt-1 line-clamp-2">
                               {item.description}
                             </p>
-                            <div className="flex items-center gap-3 mt-2">
+                            <div className="flex flex-wrap items-center gap-3 mt-2">
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${item.is_active ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                                {item.is_active ? "Visibile" : "Nascosta"}
+                              </span>
                               <span className="font-courier text-xs text-gray-400">
                                 {new Date(item.created_at).toLocaleDateString("it-IT")}
                               </span>
@@ -693,12 +760,19 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-2 self-end sm:self-start">
+                          <Button type="button" variant="outline" size="sm" data-testid={`toggle-news-visibility-${index}`}
+                            onClick={() => toggleNewsVisibility(item)} disabled={visibilityBusy !== null}
+                            aria-label={item.is_active ? `Nascondi ${item.title}` : `Mostra ${item.title}`}>
+                            {item.is_active ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                            {visibilityBusy === item.id ? "..." : item.is_active ? "Nascondi" : "Mostra"}
+                          </Button>
                           <Button
                             data-testid={`edit-news-btn-${index}`}
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditNews(item)}
+                            aria-label={`Modifica ${item.title}`}
                             className="text-[#2C3E50] hover:text-[#D4AF37]"
                           >
                             <Edit className="w-4 h-4" />
@@ -708,6 +782,7 @@ export default function AdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteClick(item)}
+                            aria-label={`Elimina ${item.title}`}
                             className="text-red-500 hover:text-red-700"
                           >
                             <Trash2 className="w-4 h-4" />

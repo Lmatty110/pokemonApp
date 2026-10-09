@@ -70,10 +70,10 @@ export default function NewsDetailPage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-4xl mx-auto px-4 py-12">
-        <article className="bg-white gold-border shadow-lg p-8 animate-fade-in">
+      <main className="max-w-4xl mx-auto px-4 py-6 sm:py-12">
+        <article className="bg-white gold-border shadow-lg p-4 sm:p-8 animate-fade-in">
           {/* Header */}
-          <div className="flex items-start gap-6 mb-8">
+          <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mb-8">
             <div className={`
               w-20 h-20 rounded-xl flex items-center justify-center flex-shrink-0
               ${news.news_type === "questionnaire" 
@@ -85,8 +85,8 @@ export default function NewsDetailPage() {
               {getNewsIcon(news.news_type)}
             </div>
             
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-3 mb-2">
                 <span className={`
                   text-xs px-3 py-1 rounded-full font-courier
                   ${news.news_type === "questionnaire" ? "bg-[#8E44AD] text-white" : 
