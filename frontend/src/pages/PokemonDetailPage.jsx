@@ -173,7 +173,7 @@ const TierLegend = () => (
             ["0", "+10%", "+0%", "30"],
             ["1", "+0%", "+5%", "60"],
             ["2", "-10%", "+10%", "90"],
-            ["3", "-20%", "+15%", "120"]
+            ["3", "-20%", "+20%", "120"]
           ].map((row, index) => (
             <tr key={row[0]} className={`border-b border-gray-100 ${index % 2 === 0 ? "bg-gray-50/50" : ""}`}>
               <td className="py-3 px-4 text-center">

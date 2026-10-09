@@ -22,7 +22,7 @@ export const getStatTier = (value) => {
 
 export const getTierModifier = (tier, kind) => {
   if (tier === null || tier === undefined) return null;
-  const modifiers = kind === "defense" ? [10, 0, -10, -20] : [0, 5, 10, 15];
+  const modifiers = kind === "defense" ? [10, 0, 10, 20] : [0, 5, 10, 20];
   return modifiers[tier] ?? null;
 };
 

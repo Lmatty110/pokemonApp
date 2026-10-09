@@ -7,9 +7,13 @@ describe("damageCalculator", () => {
     expect(getStatTier(value)).toBe(tier);
   });
 
-  test("usa i modificatori della legenda per attacchi e difese", () => {
-    expect(getTierModifier(3, "attack")).toBe(15);
-    expect(getTierModifier(3, "defense")).toBe(-20);
+  test("usa +20% per gli attacchi di tier 3", () => {
+    expect(getTierModifier(3, "attack")).toBe(20);
+  });
+
+  test("rende positivi i modificatori di difesa nel calcolatore", () => {
+    expect(getTierModifier(2, "defense")).toBe(10);
+    expect(getTierModifier(3, "defense")).toBe(20);
   });
 
   test("somma statistica, STAB e potenziamento", () => {
