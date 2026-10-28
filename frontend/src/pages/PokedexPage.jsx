@@ -53,27 +53,27 @@ export default function PokedexPage() {
   return (
     <div className="min-h-screen bg-[#111A24] text-white">
       <header className="border-b border-red-400/30 bg-[#1A2733] shadow-lg">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4">
-          <button type="button" onClick={() => navigate("/dashboard")} className="flex items-center gap-2 text-white transition-colors hover:text-[#7EF9FF]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
+          <button type="button" onClick={() => navigate("/dashboard")} className="flex min-w-0 items-center gap-2 text-white transition-colors hover:text-[#7EF9FF]">
             <ArrowLeft className="h-5 w-5" />
-            <span className="font-lato">Torna alla Bacheca</span>
+            <span className="truncate font-lato">Torna alla Bacheca</span>
           </button>
-          <div className="flex items-center gap-2 font-courier text-xs uppercase tracking-widest text-[#7EF9FF]">
-            <Wifi className="h-4 w-4" /> Archivio online
+          <div className="flex shrink-0 items-center justify-center gap-2 font-courier text-xs uppercase tracking-widest text-[#7EF9FF]" title="Archivio online">
+            <Wifi className="h-4 w-4" /> <span className="hidden sm:inline">Archivio online</span>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-10">
         <section className="pokedex-shell overflow-hidden rounded-[2rem] border-4 border-[#711B22] bg-gradient-to-br from-[#DF3545] via-[#B82030] to-[#741621] p-3 shadow-2xl sm:p-6">
-          <div className="mb-5 flex items-center gap-4 border-b border-white/20 pb-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-[#A9F8FF] shadow-[0_0_24px_rgba(126,249,255,.75)]">
-              <PokedexIcon className="h-10 w-10 text-[#C72636]" />
+          <div className="mb-4 flex items-center gap-3 border-b border-white/20 pb-4 sm:mb-5 sm:gap-4 sm:pb-5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[3px] border-white bg-[#A9F8FF] shadow-[0_0_24px_rgba(126,249,255,.75)] sm:h-16 sm:w-16 sm:border-4">
+              <PokedexIcon className="h-8 w-8 text-[#C72636] sm:h-10 sm:w-10" />
             </div>
             <div className="min-w-0">
-              <p className="font-courier text-[10px] uppercase tracking-[.28em] text-white/70">National database · Dex OS 2.0</p>
+              <p className="truncate font-courier text-[9px] uppercase tracking-[.16em] text-white/70 sm:text-[10px] sm:tracking-[.28em]">National database · Dex OS 2.0</p>
               <h1 className="font-cinzel text-2xl text-white sm:text-4xl">Pokédex</h1>
-              <p className="mt-1 font-lato text-sm text-white/75">Elenco completo e classificazione dei tipi</p>
+              <p className="mt-1 hidden font-lato text-sm text-white/75 sm:block">Elenco completo e classificazione dei tipi</p>
             </div>
             <div className="ml-auto hidden items-center gap-2 sm:flex">
               <span className="h-3 w-3 rounded-full bg-[#F4D03F] shadow-[0_0_10px_#F4D03F]" />
@@ -81,8 +81,8 @@ export default function PokedexPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border-4 border-[#263746] bg-[#D8F5F1] p-3 text-[#17202A] shadow-inner sm:p-5">
-            <div className="pokedex-screen relative overflow-hidden rounded-xl border-2 border-[#75B8B2] bg-[#E9FFFC] p-4 sm:p-6">
+          <div className="rounded-2xl border-[3px] border-[#263746] bg-[#D8F5F1] p-2 text-[#17202A] shadow-inner sm:border-4 sm:p-5">
+            <div className="pokedex-screen relative overflow-hidden rounded-xl border-2 border-[#75B8B2] bg-[#E9FFFC] p-3 sm:p-6">
               <div className="relative z-10">
                 <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto]">
                   <label className="relative block">
@@ -128,10 +128,10 @@ export default function PokedexPage() {
                 ) : visiblePokemon.length ? (
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {visiblePokemon.map(entry => (
-                      <article key={entry.id} className="group flex min-h-16 items-center gap-3 rounded-lg border border-[#75B8B2]/70 bg-white/75 px-3 py-2 transition hover:-translate-y-0.5 hover:border-[#C72636] hover:bg-white hover:shadow-md">
+                      <article key={entry.id} className="group flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-[#75B8B2]/70 bg-white/75 px-3 py-3 transition hover:-translate-y-0.5 hover:border-[#C72636] hover:bg-white hover:shadow-md lg:flex-nowrap lg:py-2">
                         <span className="w-14 shrink-0 font-courier text-xs text-[#56858A]">#{String(entry.id).padStart(4, "0")}</span>
-                        <h2 className="min-w-0 flex-1 truncate font-cinzel text-sm capitalize text-[#17202A]">{getPokemonDisplayName(entry.name)}</h2>
-                        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                        <h2 className="min-w-0 flex-1 break-words font-cinzel text-sm capitalize leading-snug text-[#17202A] lg:truncate">{getPokemonDisplayName(entry.name)}</h2>
+                        <div className="flex w-full flex-wrap justify-start gap-1 pl-[4.25rem] lg:w-auto lg:shrink-0 lg:justify-end lg:pl-0">
                           {entry.types.map(type => <TypeBadge key={type} type={type} className="px-2 text-[10px]" />)}
                         </div>
                       </article>
@@ -146,13 +146,13 @@ export default function PokedexPage() {
                 )}
 
                 {!loading && !error && totalPages > 1 && (
-                  <nav className="mt-6 flex items-center justify-center gap-3" aria-label="Paginazione Pokédex">
-                    <button type="button" disabled={page === 1} onClick={() => changePage(page - 1)} className="flex items-center gap-1 rounded-lg border-2 border-[#75B8B2] bg-white px-3 py-2 font-lato text-sm disabled:opacity-40">
-                      <ChevronLeft className="h-4 w-4" /> Precedente
+                  <nav className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex sm:justify-center sm:gap-3" aria-label="Paginazione Pokédex">
+                    <button type="button" disabled={page === 1} onClick={() => changePage(page - 1)} className="flex items-center justify-center gap-1 rounded-lg border-2 border-[#75B8B2] bg-white px-2 py-2 font-lato text-xs disabled:opacity-40 sm:px-3 sm:text-sm">
+                      <ChevronLeft className="h-4 w-4" /> <span className="hidden min-[370px]:inline">Precedente</span>
                     </button>
-                    <span className="font-courier text-sm">{page} / {totalPages}</span>
-                    <button type="button" disabled={page === totalPages} onClick={() => changePage(page + 1)} className="flex items-center gap-1 rounded-lg border-2 border-[#75B8B2] bg-white px-3 py-2 font-lato text-sm disabled:opacity-40">
-                      Successiva <ChevronRight className="h-4 w-4" />
+                    <span className="whitespace-nowrap font-courier text-xs sm:text-sm">{page} / {totalPages}</span>
+                    <button type="button" disabled={page === totalPages} onClick={() => changePage(page + 1)} className="flex items-center justify-center gap-1 rounded-lg border-2 border-[#75B8B2] bg-white px-2 py-2 font-lato text-xs disabled:opacity-40 sm:px-3 sm:text-sm">
+                      <span className="hidden min-[370px]:inline">Successiva</span> <ChevronRight className="h-4 w-4" />
                     </button>
                   </nav>
                 )}

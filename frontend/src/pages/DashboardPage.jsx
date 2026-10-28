@@ -115,17 +115,28 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#FDFBF7]">
       {/* Header */}
       <header className="bg-[#2C3E50] shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 flex items-center justify-between gap-1">
           <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             <div className="hidden sm:block shrink-0"><div className="pokeball scale-50"></div></div>
-            <h1 className="font-cinzel text-base sm:text-xl text-white">Accademia Pokémon</h1>
+            <h1 className="min-w-0 truncate font-cinzel text-sm sm:text-xl text-white">Accademia Pokémon</h1>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-4">
+          <div className="flex shrink-0 items-center gap-0 sm:gap-2 lg:gap-4">
+            <button
+              type="button"
+              onClick={() => navigate("/pokedex")}
+              data-testid="pokedex-header-link"
+              className="flex items-center gap-2 rounded-lg px-2 py-2 text-white transition-colors hover:bg-white/10 hover:text-[#D4AF37] sm:px-3"
+              aria-label="Apri il Pokédex"
+              title="Pokédex"
+            >
+              <PokedexIcon className="h-6 w-6 text-[#C0392B]" />
+              <span className="hidden font-lato text-sm lg:inline">Pokédex</span>
+            </button>
             <button
               type="button"
               onClick={() => navigate("/messages")}
-              className="relative flex items-center gap-2 text-white hover:text-[#D4AF37] transition-colors px-3 py-2 rounded-lg hover:bg-white/10"
+              className="relative flex items-center gap-2 text-white hover:text-[#D4AF37] transition-colors px-2 sm:px-3 py-2 rounded-lg hover:bg-white/10"
               aria-label={unreadMessages > 0 ? `Apri i messaggi, ${unreadMessages} da leggere` : "Apri i messaggi"}
             >
               <MessageCircle className="w-5 h-5 text-[#D4AF37]" />
@@ -141,11 +152,11 @@ export default function DashboardPage() {
               <DropdownMenuTrigger asChild>
                 <button 
                   data-testid="profile-dropdown-trigger"
-                  className="flex items-center gap-2 text-white hover:text-[#D4AF37] transition-colors px-3 py-2 rounded-lg hover:bg-white/10"
+                  className="flex items-center gap-2 text-white hover:text-[#D4AF37] transition-colors px-2 sm:px-3 py-2 rounded-lg hover:bg-white/10"
                 >
                   <User className="w-5 h-5 text-[#D4AF37]" />
                   <span className="font-lato text-sm hidden sm:inline">{user?.username}</span>
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="hidden w-4 h-4 sm:block" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-white border-[#D4AF37]">
@@ -285,32 +296,6 @@ export default function DashboardPage() {
             <ChevronRight className="w-5 h-5 text-[#D4AF37] shrink-0" />
           </button>
         )}
-
-        <section className="mb-12 animate-fade-in" aria-labelledby="quick-tools-title">
-          <h3 id="quick-tools-title" className="font-cinzel text-xl text-[#2C3E50] mb-4 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#D4AF37]" />
-            Strumenti dell'Allenatore
-          </h3>
-          <button
-            type="button"
-            data-testid="pokedex-home-link"
-            onClick={() => navigate("/pokedex")}
-            className="group relative w-full overflow-hidden rounded-2xl border-2 border-[#A51F2C] bg-gradient-to-r from-[#C92B3B] via-[#B51F31] to-[#761520] p-5 text-left text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl sm:max-w-xl"
-          >
-            <span className="absolute -right-10 -top-14 h-40 w-40 rounded-full border-[18px] border-white/5" />
-            <span className="relative flex items-center gap-4">
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-[#A9F8FF] shadow-[0_0_18px_rgba(126,249,255,.55)]">
-                <PokedexIcon className="h-10 w-10 text-[#C72636]" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-courier text-[10px] uppercase tracking-[.2em] text-white/65">Archivio nazionale</span>
-                <span className="mt-1 block font-cinzel text-xl">Apri il Pokédex</span>
-                <span className="mt-1 block font-lato text-sm text-white/75">Cerca tutti i Pokémon e filtra per tipo</span>
-              </span>
-              <ChevronRight className="h-6 w-6 shrink-0 text-[#A9F8FF] transition-transform group-hover:translate-x-1" />
-            </span>
-          </button>
-        </section>
 
         {/* News Grid - Bento Style */}
         <section>

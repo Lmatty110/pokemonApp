@@ -12,7 +12,7 @@ const ResultGroup = ({ title, description, entries, tone }) => {
     neutral: "border-gray-200 bg-white text-gray-700",
   };
   return (
-    <section className={`rounded-xl border p-4 ${tones[tone]}`}>
+    <section className={`min-w-0 rounded-xl border p-3 sm:p-4 ${tones[tone]}`}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="font-cinzel text-sm">{title}</h3>
@@ -20,7 +20,7 @@ const ResultGroup = ({ title, description, entries, tone }) => {
         </div>
         <span className="rounded-full bg-black/5 px-2 py-1 font-courier text-xs">{entries.length}</span>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-wrap gap-2">
         {entries.length
           ? entries.map(entry => <TypeBadge key={entry.type} type={entry.type} multiplier={entry.multiplier} />)
           : <span className="font-lato text-sm opacity-60">Nessun tipo</span>}
@@ -45,23 +45,23 @@ export default function TypeMatchupPage() {
   return (
     <div className="min-h-screen bg-[#F2F5F7]">
       <header className="bg-[#172433] shadow-lg">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4">
-          <button type="button" onClick={() => navigate("/dashboard")} className="flex items-center gap-2 text-white transition-colors hover:text-[#7EF9FF]">
-            <ArrowLeft className="h-5 w-5" /> <span className="font-lato">Torna alla Bacheca</span>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
+          <button type="button" onClick={() => navigate("/dashboard")} className="flex min-w-0 items-center gap-2 text-white transition-colors hover:text-[#7EF9FF]">
+            <ArrowLeft className="h-5 w-5" /> <span className="truncate font-lato">Torna alla Bacheca</span>
           </button>
           <div className="flex items-center gap-2 text-[#7EF9FF]"><Crosshair className="h-5 w-5" /><span className="hidden font-cinzel text-sm text-white sm:inline">Analisi tipi</span></div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-8 text-center">
-          <p className="font-courier text-xs uppercase tracking-[.25em] text-[#8E44AD]">Battle intelligence system</p>
-          <h1 className="mt-2 font-cinzel text-3xl text-[#2C3E50] sm:text-4xl">Calcolatore Debolezze</h1>
+      <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-8">
+        <div className="mb-6 text-center sm:mb-8">
+          <p className="font-courier text-[10px] uppercase tracking-[.18em] text-[#8E44AD] sm:text-xs sm:tracking-[.25em]">Battle intelligence system</p>
+          <h1 className="mt-2 font-cinzel text-2xl text-[#2C3E50] sm:text-4xl">Calcolatore Debolezze</h1>
           <p className="mx-auto mt-3 max-w-2xl font-lato text-gray-600">Seleziona uno o due tipi per analizzare difesa, resistenze, immunità e copertura offensiva.</p>
         </div>
 
         <section className="overflow-hidden rounded-2xl border border-[#D4AF37]/60 bg-white shadow-xl">
-          <div className="bg-gradient-to-r from-[#172433] via-[#283C4F] to-[#172433] px-5 py-4 text-white">
+          <div className="bg-gradient-to-r from-[#172433] via-[#283C4F] to-[#172433] px-4 py-4 text-white sm:px-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-cinzel text-lg">Configurazione Pokémon</h2>
@@ -71,8 +71,8 @@ export default function TypeMatchupPage() {
             </div>
           </div>
 
-          <div className="p-5 sm:p-7">
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-9">
+          <div className="p-3 sm:p-7">
+            <div className="grid grid-cols-2 gap-2 min-[390px]:grid-cols-3 sm:grid-cols-6 lg:grid-cols-9">
               {POKEMON_TYPES.map(type => {
                 const selected = selectedTypes.includes(type);
                 return (
@@ -81,7 +81,7 @@ export default function TypeMatchupPage() {
                     key={type}
                     aria-pressed={selected}
                     onClick={() => toggleType(type)}
-                    className={`relative flex min-h-14 items-center justify-center rounded-lg border-2 px-2 font-lato text-xs font-bold uppercase tracking-wide transition ${selected ? "scale-[1.03] border-[#172433] text-white shadow-lg" : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"}`}
+                    className={`relative flex min-h-14 min-w-0 items-center justify-center overflow-hidden rounded-lg border-2 px-1.5 text-center font-lato text-[11px] font-bold uppercase tracking-wide transition sm:px-2 sm:text-xs ${selected ? "scale-[1.03] border-[#172433] text-white shadow-lg" : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"}`}
                     style={selected ? { backgroundColor: TYPE_COLORS[type] } : undefined}
                   >
                     {TYPE_LABELS[type]}
@@ -93,15 +93,15 @@ export default function TypeMatchupPage() {
 
             <div className="my-7 flex flex-col items-center justify-center gap-3">
               <p className="font-courier text-xs uppercase tracking-widest text-gray-400">Profilo selezionato</p>
-              <div className="flex items-center gap-2">
-                {selectedTypes.map(type => <TypeBadge key={type} type={type} className="min-h-10 px-5 text-sm" />)}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {selectedTypes.map(type => <TypeBadge key={type} type={type} className="min-h-10 px-4 text-sm sm:px-5" />)}
               </div>
               <ArrowDown className="h-5 w-5 animate-bounce text-[#D4AF37]" />
             </div>
 
             {result && (
               <div className="grid gap-7 xl:grid-cols-2">
-                <article className="rounded-2xl border-2 border-[#2C3E50]/15 bg-[#F8FAFC] p-4 sm:p-6">
+                <article className="min-w-0 rounded-2xl border-2 border-[#2C3E50]/15 bg-[#F8FAFC] p-3 sm:p-6">
                   <div className="mb-5 flex items-start gap-3">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#2C3E50] text-[#D4AF37]"><Shield className="h-6 w-6" /></span>
                     <div><h2 className="font-cinzel text-xl text-[#2C3E50]">In difesa</h2><p className="mt-1 font-lato text-sm text-gray-500">Come gli attacchi avversari colpiscono questo Pokémon.</p></div>
@@ -114,7 +114,7 @@ export default function TypeMatchupPage() {
                   </div>
                 </article>
 
-                <article className="rounded-2xl border-2 border-[#8E44AD]/15 bg-[#FCF9FF] p-4 sm:p-6">
+                <article className="min-w-0 rounded-2xl border-2 border-[#8E44AD]/15 bg-[#FCF9FF] p-3 sm:p-6">
                   <div className="mb-5 flex items-start gap-3">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#8E44AD] text-white"><Swords className="h-6 w-6" /></span>
                     <div><h2 className="font-cinzel text-xl text-[#2C3E50]">In attacco</h2><p className="mt-1 font-lato text-sm text-gray-500">{selectedTypes.length === 2 ? "Copertura usando il migliore dei due attacchi STAB." : "Efficacia degli attacchi dello stesso tipo."}</p></div>
