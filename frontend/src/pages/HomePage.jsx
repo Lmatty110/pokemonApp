@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 import { Button } from "../components/ui/button";
 import { BookOpen, Award, Users, Scroll } from "lucide-react";
+import PokedexIcon from "../components/PokedexIcon";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -53,6 +54,22 @@ export default function HomePage() {
           >
             Entra nell'Accademia
           </Button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/pokedex")}
+            data-testid="homepage-pokedex-link"
+            className="group absolute bottom-5 right-4 flex items-center gap-3 rounded-2xl border border-white/30 bg-[#B82030]/90 p-3 pr-4 text-left text-white shadow-xl backdrop-blur-sm transition hover:-translate-y-1 hover:bg-[#C92B3B] sm:bottom-8 sm:right-8"
+            aria-label="Apri il Pokédex"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-[#A9F8FF]">
+              <PokedexIcon className="h-8 w-8 text-[#C72636]" />
+            </span>
+            <span className="hidden sm:block">
+              <span className="block font-courier text-[9px] uppercase tracking-widest text-white/65">Archivio</span>
+              <span className="block font-cinzel text-sm">Pokédex</span>
+            </span>
+          </button>
         </div>
       </section>
 

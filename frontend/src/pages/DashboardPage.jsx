@@ -23,7 +23,8 @@ import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
 import useChatUnreadCount from "../hooks/useChatUnreadCount";
-import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack, Plus, MessageCircle, Calculator } from "lucide-react";
+import PokedexIcon from "../components/PokedexIcon";
+import { LogOut, Scroll, Bell, ChevronRight, User, Sparkles, Clock, Star, ChevronDown, Gamepad2, Backpack, Plus, MessageCircle, Calculator, Crosshair } from "lucide-react";
 
 export default function DashboardPage() {
   const [news, setNews] = useState([]);
@@ -177,6 +178,14 @@ export default function DashboardPage() {
                   <span className="font-lato">Visualizza Pokémon Posseduti</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  data-testid="pokedex-menu-item"
+                  onClick={() => navigate("/pokedex")}
+                  className="cursor-pointer"
+                >
+                  <PokedexIcon className="w-4 h-4 mr-2 text-[#C0392B]" />
+                  <span className="font-lato">Pokédex</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   data-testid="messages-menu-item"
                   onClick={() => navigate("/messages")}
                   className="cursor-pointer"
@@ -195,7 +204,15 @@ export default function DashboardPage() {
                   className="cursor-pointer"
                 >
                   <Calculator className="w-4 h-4 mr-2 text-[#8E44AD]" />
-                  <span className="font-lato">Calcolatore</span>
+                  <span className="font-lato">Calcolatore danni</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="type-matchups-menu-item"
+                  onClick={() => navigate("/type-matchups")}
+                  className="cursor-pointer"
+                >
+                  <Crosshair className="w-4 h-4 mr-2 text-[#C0392B]" />
+                  <span className="font-lato">Debolezze e resistenze</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
@@ -268,6 +285,32 @@ export default function DashboardPage() {
             <ChevronRight className="w-5 h-5 text-[#D4AF37] shrink-0" />
           </button>
         )}
+
+        <section className="mb-12 animate-fade-in" aria-labelledby="quick-tools-title">
+          <h3 id="quick-tools-title" className="font-cinzel text-xl text-[#2C3E50] mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-[#D4AF37]" />
+            Strumenti dell'Allenatore
+          </h3>
+          <button
+            type="button"
+            data-testid="pokedex-home-link"
+            onClick={() => navigate("/pokedex")}
+            className="group relative w-full overflow-hidden rounded-2xl border-2 border-[#A51F2C] bg-gradient-to-r from-[#C92B3B] via-[#B51F31] to-[#761520] p-5 text-left text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl sm:max-w-xl"
+          >
+            <span className="absolute -right-10 -top-14 h-40 w-40 rounded-full border-[18px] border-white/5" />
+            <span className="relative flex items-center gap-4">
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-[#A9F8FF] shadow-[0_0_18px_rgba(126,249,255,.55)]">
+                <PokedexIcon className="h-10 w-10 text-[#C72636]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-courier text-[10px] uppercase tracking-[.2em] text-white/65">Archivio nazionale</span>
+                <span className="mt-1 block font-cinzel text-xl">Apri il Pokédex</span>
+                <span className="mt-1 block font-lato text-sm text-white/75">Cerca tutti i Pokémon e filtra per tipo</span>
+              </span>
+              <ChevronRight className="h-6 w-6 shrink-0 text-[#A9F8FF] transition-transform group-hover:translate-x-1" />
+            </span>
+          </button>
+        </section>
 
         {/* News Grid - Bento Style */}
         <section>

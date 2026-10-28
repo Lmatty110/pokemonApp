@@ -19,6 +19,8 @@ import ProfilePage from "./pages/ProfilePage";
 import InventoryPage from "./pages/InventoryPage";
 import ChatPage from "./pages/ChatPage";
 import CalculatorPage from "./pages/CalculatorPage";
+import PokedexPage from "./pages/PokedexPage";
+import TypeMatchupPage from "./pages/TypeMatchupPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -162,6 +164,14 @@ function App() {
           <Route
             path="/calculator"
             element={<ProtectedRoute><CalculatorPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/pokedex"
+            element={<ProtectedRoute><PokedexPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/type-matchups"
+            element={<ProtectedRoute><TypeMatchupPage /></ProtectedRoute>}
           />
           <Route
             path="/pokemon/:pokemonId"

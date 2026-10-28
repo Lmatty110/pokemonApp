@@ -1,5 +1,29 @@
 /* App-specific styles */
 
+.pokedex-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.13;
+    background: repeating-linear-gradient(to bottom, transparent 0, transparent 3px, #32686d 4px);
+}
+
+.pokedex-shell {
+    position: relative;
+    isolation: isolate;
+}
+
+.pokedex-shell::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    z-index: -1;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 1.5rem;
+    pointer-events: none;
+}
+
 /* Hero section background */
 .hero-bg {
     background-image: url('https://images.unsplash.com/photo-1764093488095-b96aa49b2e47?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxib29rc2hlbHZlcyUyMG9sZCUyMGxpYnJhcnklMjBkYXJrJTIwd29vZHxlbnwwfHx8fDE3NzA1NDc2NTJ8MA&ixlib=rb-4.1.0&q=85');
