@@ -33,6 +33,25 @@ test("falls back to Ultrasole e Ultraluna and leaves unsupported games unused", 
   expect(latestLearnsetGroup(moves, "machine")).toBeNull();
 });
 
+test("Raticate uses Ultrasole/Ultraluna instead of Blue Japan for both lists", () => {
+  const ultra = group("ultra-sun-ultra-moon", 18);
+  const blue = group("blue-japan", 1);
+  const moves = [
+    { move: { name: "tackle" }, version_group_details: [detail(blue, "level-up", 1), detail(ultra, "level-up", 1)] },
+    { move: { name: "bite" }, version_group_details: [detail(ultra, "level-up", 10)] },
+    { move: { name: "ice-beam" }, version_group_details: [detail(blue, "machine"), detail(ultra, "machine")] },
+    { move: { name: "body-slam" }, version_group_details: [detail(blue, "machine")] },
+  ];
+  const levelSource = latestLearnsetGroup(moves, "level-up");
+  const machineSource = latestLearnsetGroup(moves, "machine");
+  expect(levelSource?.name).toBe("ultra-sun-ultra-moon");
+  expect(machineSource?.name).toBe("ultra-sun-ultra-moon");
+  expect(filterLearnset(moves, levelSource.name, "level-up").map(move => move.move.name))
+    .toEqual(["tackle", "bite"]);
+  expect(filterLearnset(moves, machineSource.name, "machine").map(move => move.move.name))
+    .toEqual(["ice-beam"]);
+});
+
 test("keeps both learn methods when PokeAPI lists them for the same move and version", () => {
   const version = group("scarlet-violet", 25);
   const moves = [{ move: { name: "tackle" }, version_group_details: [

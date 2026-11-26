@@ -1,3 +1,5 @@
+import { VERSION_GROUPS, isSupportedMoveVersion } from "./learnsets";
+
 export const TYPE_LABELS = {
   normal: "Normale", fire: "Fuoco", water: "Acqua", electric: "Elettro",
   grass: "Erba", ice: "Ghiaccio", fighting: "Lotta", poison: "Veleno",
@@ -52,14 +54,19 @@ const STATS = { attack: "Attacco", defense: "Difesa", "special-attack": "Attacco
 const chanceLabel = chance => chance > 0 ? ` (${chance}%)` : "";
 
 export function describeMoveEffects(data, versionGroup) {
-  const texts = data.flavor_text_entries || [];
-  const italian = texts.find(entry => entry.language?.name === "it" && entry.version_group?.name === versionGroup)
-    || [...texts].reverse().find(entry => entry.language?.name === "it");
+  const texts = (data.flavor_text_entries || []).filter(entry =>
+    isSupportedMoveVersion(entry.version_group?.name));
+  const preferredGroups = isSupportedMoveVersion(versionGroup)
+    ? [versionGroup, ...VERSION_GROUPS.map(group => group.name).filter(name => name !== versionGroup)]
+    : VERSION_GROUPS.map(group => group.name);
+  const flavorText = preferredGroups.map(group =>
+    texts.find(entry => entry.version_group.name === group && entry.language?.name === "it")
+    || texts.find(entry => entry.version_group.name === group && entry.language?.name === "en")
+  ).find(Boolean);
   const effects = data.effect_entries || [];
   const detailed = effects.find(entry => entry.language?.name === "it")
     || effects.find(entry => entry.language?.name === "en");
-  const english = [...texts].reverse().find(entry => entry.language?.name === "en");
-  const description = italian || detailed || english;
+  const description = flavorText || detailed;
   const text = cleanMoveText(description?.flavor_text || description?.effect || description?.short_effect, data.effect_chance);
   const meta = data.meta;
   const secondary = [];

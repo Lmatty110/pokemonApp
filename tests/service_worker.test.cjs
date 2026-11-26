@@ -92,5 +92,5 @@ test('activation removes only obsolete academy caches', async () => {
   let task;
   worker.handlers.activate({ waitUntil: value => { task = value; } });
   await task;
-  assert.deepEqual(worker.deleted, ['pokemon-academy-v1']);
+  assert.deepEqual(worker.deleted, ['pokemon-academy-v1', 'pokemon-academy-v2']);
 });

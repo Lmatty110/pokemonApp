@@ -28,8 +28,25 @@ describe("move effects", () => {
       secondary: ["Stato alterato: Scottatura (10%)."],
     });
   });
-  test("falls back to available Italian text before English", () => {
-    expect(describeMoveEffects(base, "unknown-version").text).toBe("Altra versione.");
+  test("falls back to the newest allowed game's text", () => {
+    expect(describeMoveEffects(base, "unknown-version").text).toBe("Descrizione italiana corretta.");
+  });
+  test("never uses flavor text from games outside the three allowed version groups", () => {
+    const effects = describeMoveEffects({
+      flavor_text_entries: [
+        { language: { name: "it" }, version_group: { name: "blue-japan" }, flavor_text: "Testo di Blue Japan" },
+        { language: { name: "en" }, version_group: { name: "legends-z-a" }, flavor_text: "Text from Z-A" },
+      ],
+      effect_entries: [],
+    }, "scarlet-violet");
+    expect(effects.text).toBe("");
+    expect(effects.language).toBeUndefined();
+  });
+  test("prefers the selected game's English text over an older game's Italian text", () => {
+    expect(describeMoveEffects({ flavor_text_entries: [
+      { language: { name: "it" }, version_group: { name: "ultra-sun-ultra-moon" }, flavor_text: "Descrizione precedente" },
+      { language: { name: "en" }, version_group: { name: "scarlet-violet" }, flavor_text: "Current game description" },
+    ] }, "scarlet-violet").text).toBe("Current game description");
   });
   test("English fallback is labelled and chance placeholders are resolved", () => {
     expect(describeMoveEffects({ ...base, flavor_text_entries: [] })).toMatchObject({

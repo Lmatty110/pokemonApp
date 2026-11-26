@@ -1,9 +1,11 @@
 // Only these games use the standard level-up and TM learnsets shown in the app.
-const VERSION_GROUPS = [
+export const VERSION_GROUPS = [
   { name: "scarlet-violet", displayName: "Pokémon Scarlatto e Violetto" },
   { name: "sword-shield", displayName: "Pokémon Spada e Scudo" },
   { name: "ultra-sun-ultra-moon", displayName: "Pokémon Ultrasole e Ultraluna" },
 ];
+
+export const isSupportedMoveVersion = name => VERSION_GROUPS.some(group => group.name === name);
 
 export function latestLearnsetGroup(moves, method) {
   return VERSION_GROUPS.find(group => (moves || []).some(move =>
@@ -13,7 +15,7 @@ export function latestLearnsetGroup(moves, method) {
 }
 
 export function filterLearnset(moves, groupName, method) {
-  if (!VERSION_GROUPS.some(group => group.name === groupName)) return [];
+  if (!isSupportedMoveVersion(groupName)) return [];
   return (moves || []).flatMap(move => {
     const details = (move.version_group_details || []).filter(detail =>
       detail.version_group.name === groupName && detail.move_learn_method.name === method);

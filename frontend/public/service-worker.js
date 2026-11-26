@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pokemon-academy-v2';
+const CACHE_NAME = 'pokemon-academy-v3';
 const urlsToCache = [
   '/index.html',
   '/manifest.json'
