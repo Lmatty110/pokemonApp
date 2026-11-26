@@ -1,7 +1,7 @@
 import axios from "axios";
 import { POKEMON_TYPES } from "./pokemonTypes";
 
-const CACHE_KEY = "academy-pokedex-v2";
+const CACHE_KEY = "academy-pokedex-v3";
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 const GRAPHQL_URL = "https://graphql.pokeapi.co/v1beta2";
 
@@ -13,7 +13,7 @@ const normalizePokemon = pokemon => ({
 
 const loadFromGraphql = async () => {
   const query = `query AcademyPokedex {
-    pokemon(where: {is_default: {_eq: true}}, order_by: {id: asc}) {
+    pokemon(order_by: {id: asc}) {
       id
       name
       pokemontypes(order_by: {slot: asc}) { slot type { name } }
@@ -45,15 +45,29 @@ const loadFromRest = async () => {
       name: resource.name,
       types: (typesByPokemon.get(resource.name) || []).sort((a, b) => a.slot - b.slot).map(type => type.name),
     }))
-    .filter(pokemon => Number.isFinite(pokemon.id) && pokemon.id < 10000 && pokemon.types.length);
+    .filter(pokemon => Number.isFinite(pokemon.id) && pokemon.types.length);
 };
 
-export const getPokemonDisplayName = name => name
-  .split("-")
-  .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(" ");
+const REGIONS = { alola: "Alola", galar: "Galar", hisui: "Hisui", paldea: "Paldea" };
+const ROTOM_FORMS = {
+  heat: "Forno", wash: "Lavatrice", frost: "Frigorifero",
+  fan: "Ventilatore", mow: "Tagliaerba",
+};
+const titleCase = name => name.split("-").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 
-export const loadPokedex = async () => {
+export const getPokemonDisplayName = (name, speciesName, speciesSlug) => {
+  if (!name) return "";
+  const regional = name.match(/-(alola|galar|hisui|paldea)(?:-(standard|zen))?$/);
+  if (regional) return `${speciesName || titleCase(name.slice(0, regional.index))} di ${REGIONS[regional[1]]}${regional[2] ? ` (${titleCase(regional[2])})` : ""}`;
+  const rotomForm = name.match(/^rotom-(heat|wash|frost|fan|mow)$/)?.[1];
+  if (rotomForm) return `${speciesName || "Rotom"} ${ROTOM_FORMS[rotomForm]}`;
+  if (speciesName && speciesSlug && name.startsWith(`${speciesSlug}-`)) {
+    return `${speciesName} ${titleCase(name.slice(speciesSlug.length + 1))}`;
+  }
+  return speciesName || titleCase(name);
+};
+
+const fetchPokedex = async () => {
   try {
     const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
     if (cached?.savedAt > Date.now() - CACHE_DURATION && Array.isArray(cached.pokemon)) return cached.pokemon;
@@ -74,5 +88,13 @@ export const loadPokedex = async () => {
     // L'app resta utilizzabile anche se lo storage è pieno o disabilitato.
   }
   return pokemon;
+};
+
+let pendingPokedex;
+export const loadPokedex = () => {
+  if (!pendingPokedex) {
+    pendingPokedex = fetchPokedex().finally(() => { pendingPokedex = null; });
+  }
+  return pendingPokedex;
 };
 

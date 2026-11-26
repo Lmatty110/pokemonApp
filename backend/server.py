@@ -114,6 +114,7 @@ class AdminInventoryQuantity(BaseModel):
 
 class PokemonEvolution(BaseModel):
     pokemon_id: int = Field(strict=True, ge=1)
+    ability: Optional[str] = None
 
 class ActiveTeamUpdate(BaseModel):
     pokemon_ids: List[str] = Field(max_length=3)
@@ -1061,7 +1062,39 @@ async def evolution_options(pokemon_id: int):
             if found is not None:
                 return found
         return None
-    return find(chain["chain"]) or []
+    options = find(chain["chain"]) or []
+    region = next((suffix for suffix in ("alola", "galar", "hisui", "paldea")
+                   if pokemon.get("name", "").endswith(f"-{suffix}")), None)
+    if not region:
+        return options
+    regional_options = []
+    new_species_options = []
+    region_generation = {"alola": "generation-vii", "galar": "generation-viii",
+                         "hisui": "generation-viii", "paldea": "generation-ix"}[region]
+    for option in options:
+        evolved_species = await fetch_pokeapi(f"pokemon-species/{option['pokemon_id']}")
+        variety = next((entry["pokemon"] for entry in evolved_species.get("varieties", [])
+                        if entry["pokemon"]["name"].endswith(f"-{region}")
+                        or f"-{region}-standard" in entry["pokemon"]["name"]), None)
+        if variety:
+            regional_options.append({
+                "pokemon_id": int(variety["url"].rstrip("/").split("/")[-1]),
+                "pokemon_name": variety["name"],
+            })
+        elif (evolved_species.get("generation") or {}).get("name") == region_generation:
+            new_species_options.append(option)
+    return regional_options or new_species_options or options
+
+
+def mapped_evolution_ability(current_ability: str, current_abilities: list, evolved_abilities: list):
+    """An ability keeps its slot (including the hidden slot) across evolution."""
+    current = next((entry for entry in current_abilities
+                    if entry["ability"]["name"] == current_ability), None)
+    if not current:
+        return None
+    evolved = next((entry for entry in evolved_abilities
+                    if entry["slot"] == current["slot"]), None)
+    return evolved["ability"]["name"] if evolved else None
 
 
 @api_router.get("/pokemon/my/{pokemon_id}/evolutions")
@@ -1069,7 +1102,16 @@ async def get_evolutions(pokemon_id: int, current_user: dict = Depends(get_curre
     owned = await db.user_pokemon.find_one({"user_id": current_user["id"], "pokemon_id": pokemon_id})
     if not owned:
         raise HTTPException(status_code=404, detail="Pokemon non trovato")
-    return await evolution_options(pokemon_id)
+    options = await evolution_options(pokemon_id)
+    if not owned.get("ability"):
+        return options
+    current = await fetch_pokeapi(f"pokemon/{pokemon_id}")
+    for option in options:
+        evolved = await fetch_pokeapi(f"pokemon/{option['pokemon_id']}")
+        option["ability_options"] = [entry["ability"]["name"] for entry in evolved.get("abilities", [])]
+        option["suggested_ability"] = mapped_evolution_ability(
+            owned["ability"], current.get("abilities", []), evolved.get("abilities", []))
+    return options
 
 
 @api_router.post("/pokemon/my/{pokemon_id}/evolve")
@@ -1086,9 +1128,19 @@ async def evolve_pokemon(pokemon_id: int, evolution: PokemonEvolution, current_u
     if existing:
         raise HTTPException(status_code=409, detail="Possiedi già questo stadio evolutivo: gestiscilo con l'admin prima di evolvere.")
     if owned.get("ability"):
+        current = await fetch_pokeapi(f"pokemon/{pokemon_id}")
         evolved = await fetch_pokeapi(f"pokemon/{evolution.pokemon_id}")
-        if owned["ability"] not in {entry["ability"]["name"] for entry in evolved.get("abilities", [])}:
-            target = {**target, "ability": None}
+        available = {entry["ability"]["name"] for entry in evolved.get("abilities", [])}
+        if evolution.ability is not None:
+            if evolution.ability not in available:
+                raise HTTPException(status_code=400, detail="Abilità non disponibile per l'evoluzione")
+            new_ability = evolution.ability
+        else:
+            new_ability = mapped_evolution_ability(
+                owned["ability"], current.get("abilities", []), evolved.get("abilities", []))
+            if new_ability is None:
+                raise HTTPException(status_code=400, detail="Scegli un'abilità per l'evoluzione")
+        target = {**target, "ability": new_ability}
     result = await db.user_pokemon.update_one({**query, "id": owned["id"]}, {"$set": target})
     if not result.matched_count:
         raise HTTPException(status_code=409, detail="Il Pokemon è cambiato. Ricarica la pagina.")

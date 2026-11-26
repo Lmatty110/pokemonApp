@@ -23,8 +23,8 @@ class HTTPException(Exception):
 
 def load_routes(db):
     tree = ast.parse((Path(__file__).parents[1] / "server.py").read_text(encoding="utf-8"))
-    names = {"fetch_pokeapi", "evolution_options", "evolve_pokemon", "get_evolutions", "set_admin_inventory", "update_my_pokemon"}
-    functions = [node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name in names]
+    names = {"fetch_pokeapi", "evolution_options", "mapped_evolution_ability", "evolve_pokemon", "get_evolutions", "set_admin_inventory", "update_my_pokemon"}
+    functions = [node for node in tree.body if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) and node.name in names]
     for node in functions:
         node.decorator_list = []
         node.args.defaults = []
@@ -127,12 +127,48 @@ class InventoryEvolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.collection.update_one.call_args.args[1], {"$set": {"nickname": "Spark"}})
         self.routes["fetch_pokeapi"].assert_not_awaited()
 
-    async def test_evolution_clears_incompatible_ability(self):
+    async def test_evolution_maps_ability_by_slot(self):
         self.collection.find_one.side_effect = [{"id": "record", "ability": "static"}, None, {}]
         self.collection.update_one.return_value = SimpleNamespace(matched_count=1)
-        self.routes["fetch_pokeapi"] = AsyncMock(return_value={"abilities": [{"ability": {"name": "surge-surfer"}}]})
-        await self.routes["evolve_pokemon"](25, SimpleNamespace(pokemon_id=26), {"id": "trainer"})
-        self.assertIsNone(self.collection.update_one.call_args.args[1]["$set"]["ability"])
+        self.routes["fetch_pokeapi"] = AsyncMock(side_effect=[
+            {"abilities": [{"ability": {"name": "static"}, "slot": 1}]},
+            {"abilities": [{"ability": {"name": "surge-surfer"}, "slot": 1},
+                           {"ability": {"name": "lightning-rod"}, "slot": 3}]},
+        ])
+        await self.routes["evolve_pokemon"](25, SimpleNamespace(pokemon_id=26, ability=None), {"id": "trainer"})
+        self.assertEqual(self.collection.update_one.call_args.args[1]["$set"]["ability"], "surge-surfer")
+
+    async def test_evolution_requires_choice_when_slot_is_missing(self):
+        self.collection.find_one.side_effect = [{"id": "record", "ability": "static"}, None]
+        self.routes["fetch_pokeapi"] = AsyncMock(side_effect=[
+            {"abilities": [{"ability": {"name": "static"}, "slot": 2}]},
+            {"abilities": [{"ability": {"name": "surge-surfer"}, "slot": 1}]},
+        ])
+        with self.assertRaises(HTTPException) as error:
+            await self.routes["evolve_pokemon"](25, SimpleNamespace(pokemon_id=26, ability=None), {"id": "trainer"})
+        self.assertEqual(error.exception.status_code, 400)
+        self.collection.update_one.assert_not_awaited()
+
+    async def test_evolution_accepts_valid_choice_when_slot_is_missing(self):
+        self.collection.find_one.side_effect = [{"id": "record", "ability": "static"}, None, {}]
+        self.collection.update_one.return_value = SimpleNamespace(matched_count=1)
+        self.routes["fetch_pokeapi"] = AsyncMock(side_effect=[
+            {"abilities": [{"ability": {"name": "static"}, "slot": 2}]},
+            {"abilities": [{"ability": {"name": "surge-surfer"}, "slot": 1}]},
+        ])
+        await self.routes["evolve_pokemon"](25, SimpleNamespace(pokemon_id=26, ability="surge-surfer"), {"id": "trainer"})
+        self.assertEqual(self.collection.update_one.call_args.args[1]["$set"]["ability"], "surge-surfer")
+
+    async def test_evolution_options_include_ability_mapping_and_choices(self):
+        self.collection.find_one.return_value = {"ability": "static"}
+        self.routes["fetch_pokeapi"] = AsyncMock(side_effect=[
+            {"abilities": [{"ability": {"name": "static"}, "slot": 1}]},
+            {"abilities": [{"ability": {"name": "surge-surfer"}, "slot": 1},
+                           {"ability": {"name": "lightning-rod"}, "slot": 3}]},
+        ])
+        options = await self.routes["get_evolutions"](25, {"id": "trainer"})
+        self.assertEqual(options[0]["suggested_ability"], "surge-surfer")
+        self.assertEqual(options[0]["ability_options"], ["surge-surfer", "lightning-rod"])
 
     async def test_only_immediate_evolutions_and_branches(self):
         def node(name, number, children=None):
@@ -149,6 +185,38 @@ class InventoryEvolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await options("raichu", 26), [])
         chain = node("eevee", 133, [node("vaporeon", 134), node("jolteon", 135)])
         self.assertEqual([item["pokemon_id"] for item in await options("eevee", 133)], [134, 135])
+
+    async def test_regional_evolution_keeps_regional_variety(self):
+        def species(name, number, children=None):
+            return {"species": {"name": name, "url": f"https://pokeapi.co/api/v2/pokemon-species/{number}/"},
+                    "evolves_to": children or []}
+        chain = species("zigzagoon", 263, [species("linoone", 264)])
+        routes = load_routes(SimpleNamespace())
+        routes["fetch_pokeapi"] = AsyncMock(side_effect=[
+            {"name": "zigzagoon-galar", "species": {"url": "https://pokeapi.co/api/v2/pokemon-species/263/"}},
+            {"name": "zigzagoon", "evolution_chain": {"url": "https://pokeapi.co/api/v2/evolution-chain/1/"}},
+            {"chain": chain},
+            {"varieties": [{"pokemon": {"name": "linoone", "url": "https://pokeapi.co/api/v2/pokemon/264/"}},
+                           {"pokemon": {"name": "linoone-galar", "url": "https://pokeapi.co/api/v2/pokemon/10180/"}}]},
+        ])
+        self.assertEqual(await routes["evolution_options"](10172),
+                         [{"pokemon_id": 10180, "pokemon_name": "linoone-galar"}])
+
+    async def test_regional_branch_prefers_species_introduced_with_region(self):
+        def species(name, number, children=None):
+            return {"species": {"name": name, "url": f"https://pokeapi.co/api/v2/pokemon-species/{number}/"},
+                    "evolves_to": children or []}
+        chain = species("wooper", 194, [species("quagsire", 195), species("clodsire", 980)])
+        routes = load_routes(SimpleNamespace())
+        routes["fetch_pokeapi"] = AsyncMock(side_effect=[
+            {"name": "wooper-paldea", "species": {"url": "https://pokeapi.co/api/v2/pokemon-species/194/"}},
+            {"name": "wooper", "evolution_chain": {"url": "https://pokeapi.co/api/v2/evolution-chain/1/"}},
+            {"chain": chain},
+            {"varieties": [], "generation": {"name": "generation-ii"}},
+            {"varieties": [], "generation": {"name": "generation-ix"}},
+        ])
+        self.assertEqual(await routes["evolution_options"](10253),
+                         [{"pokemon_id": 980, "pokemon_name": "clodsire"}])
 
 
 if __name__ == "__main__":

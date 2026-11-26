@@ -11,6 +11,8 @@ import MoveEffectsDialog from "../components/MoveEffectsDialog";
 import { MoveEffectsButton, MovePower, MoveType } from "../components/MoveInfo";
 import { getDamageClassLabel, getTypeColor } from "../lib/moves";
 import { getMoveData } from "../lib/moveData";
+import { getPokemonDisplayName } from "../lib/pokedex";
+import { latestLearnsetGroup, filterLearnset } from "../lib/learnsets";
 import useAutoSave from "../hooks/useAutoSave";
 import AutoSaveStatus from "../components/AutoSaveStatus";
 import { changedFields, recoverPendingSave } from "../lib/autoSave";
@@ -22,18 +24,6 @@ import { Progress } from "../components/ui/progress";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
-
-// Version groups in order from newest to oldest
-const VERSION_GROUPS = [
-  { name: "scarlet-violet", displayName: "Pokémon Scarlatto e Violetto" },
-  { name: "sword-shield", displayName: "Pokémon Spada e Scudo" },
-  { name: "ultra-sun-ultra-moon", displayName: "Pokémon Ultrasole e Ultraluna" },
-  { name: "sun-moon", displayName: "Pokémon Sole e Luna" },
-  { name: "omega-ruby-alpha-sapphire", displayName: "Pokémon Rubino Omega e Zaffiro Alpha" },
-  { name: "x-y", displayName: "Pokémon X e Y" },
-  { name: "black-2-white-2", displayName: "Pokémon Nero 2 e Bianco 2" },
-  { name: "black-white", displayName: "Pokémon Nero e Bianco" },
-];
 
 const getStatIcon = (stat) => {
   switch (stat) {
@@ -509,36 +499,18 @@ function PokemonDetail() {
       const speciesRes = await axios.get(pokemonData.species.url);
       setSpecies(speciesRes.data);
 
-      let foundMoves = false;
-
-      for (const versionGroup of VERSION_GROUPS) {
-        const { levelUpMoves, machineMoves } = filterMovesByVersion(
-          pokemonData.moves,
-          versionGroup.name
-        );
-
-        if (levelUpMoves.length > 0 || machineMoves.length > 0) {
-          foundMoves = true;
-
-          levelUpMoves.sort((a, b) => a.level - b.level);
-
-          const [levelMoveDetails, tmMoveDetails] = await Promise.all([
-            fetchMoveDetails(levelUpMoves.slice(0, 50), true),
-            fetchMoveDetails(machineMoves.slice(0, 60), false, versionGroup.name)
-          ]);
-
-          setLevelMoves(levelMoveDetails);
-          setTmMoves(tmMoveDetails);
-          setDataSource(versionGroup);
-          break;
-        }
-      }
-
-      if (!foundMoves) {
-        setLevelMoves([]);
-        setTmMoves([]);
-        setDataSource(null);
-      }
+      const levelSource = latestLearnsetGroup(pokemonData.moves, "level-up");
+      const machineSource = latestLearnsetGroup(pokemonData.moves, "machine");
+      const levelUpMoves = filterLearnset(pokemonData.moves, levelSource?.name, "level-up")
+        .sort((a, b) => a.level - b.level);
+      const machineMoves = filterLearnset(pokemonData.moves, machineSource?.name, "machine");
+      const [levelMoveDetails, tmMoveDetails] = await Promise.all([
+        fetchMoveDetails(levelUpMoves, true),
+        fetchMoveDetails(machineMoves, false, machineSource?.name),
+      ]);
+      setLevelMoves(levelMoveDetails);
+      setTmMoves(tmMoveDetails);
+      setDataSource({ level: levelSource, tm: machineSource });
     } catch (error) {
       console.error(error);
       toast.error("Alcuni dati aggiuntivi del Pokémon non sono disponibili");
@@ -547,33 +519,10 @@ function PokemonDetail() {
     }
   };
 
-  const filterMovesByVersion = (moves, versionGroupName) => {
-    const levelUpMoves = [];
-    const machineMoves = [];
-
-    moves.forEach(move => {
-      const versionDetails = move.version_group_details.find(
-        vgd => vgd.version_group.name === versionGroupName
-      );
-
-      if (!versionDetails) return;
-
-      if (versionDetails.move_learn_method.name === "level-up") {
-        levelUpMoves.push({
-          ...move,
-          level: versionDetails.level_learned_at
-        });
-      } else if (versionDetails.move_learn_method.name === "machine") {
-        machineMoves.push(move);
-      }
-    });
-
-    return { levelUpMoves, machineMoves };
-  };
-
   const fetchMoveDetails = async (moves, isLevelUp, versionGroupName = null) => {
-    const moveDetails = await Promise.all(
-      moves.map(async (move) => {
+    const moveDetails = [];
+    for (let offset = 0; offset < moves.length; offset += 20) {
+      const batch = await Promise.all(moves.slice(offset, offset + 20).map(async (move) => {
         try {
           const moveData = await getMoveData(move.move.name);
 
@@ -614,8 +563,9 @@ function PokemonDetail() {
         } catch {
           return null;
         }
-      })
-    );
+      }));
+      moveDetails.push(...batch);
+    }
 
     return moveDetails.filter(Boolean);
   };
@@ -700,7 +650,8 @@ function PokemonDetail() {
 
   const getItalianName = () => {
     if (!species) return pokemon?.name;
-    return species.names.find(n => n.language.name === "it")?.name || pokemon?.name;
+    const italian = species.names.find(n => n.language.name === "it")?.name;
+    return getPokemonDisplayName(pokemon?.name, italian, species.name);
   };
 
   if (loading) {
@@ -755,7 +706,7 @@ function PokemonDetail() {
                   className="w-40 h-40 object-contain"
                 />
               </div>
-              <PokemonEvolution pokemonId={pokemonId} owned={Boolean(userPokemonData?.id)}
+              <PokemonEvolution pokemonId={pokemonId} owned={Boolean(userPokemonData?.id)} currentAbility={userPokemonData?.ability}
                 disabled={autoSave.dirty} />
             </div>
 
@@ -1025,11 +976,11 @@ function PokemonDetail() {
               </div>
             )}
 
-            {dataSource && (
+            {dataSource?.[movesSubTab] && (
               <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <Info className="w-5 h-5 text-blue-500 flex-shrink-0" />
                 <p className="font-lato text-sm text-blue-700">
-                  Dati recuperati da: <strong>{dataSource.displayName}</strong>
+                  Dati recuperati da: <strong>{dataSource[movesSubTab].displayName}</strong>
                 </p>
               </div>
             )}
@@ -1099,7 +1050,7 @@ function PokemonDetail() {
           )
         )}
       </div>
-      <MoveEffectsDialog move={effectsMove} onClose={() => setEffectsMove(null)} versionGroup={dataSource?.name} />
+      <MoveEffectsDialog move={effectsMove} onClose={() => setEffectsMove(null)} versionGroup={dataSource?.[movesSubTab]?.name} />
     </div>
   );
 }

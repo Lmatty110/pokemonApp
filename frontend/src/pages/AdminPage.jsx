@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import api from "../api";
 import AdminInventory from "../components/AdminInventory";
+import { getPokemonDisplayName, loadPokedex } from "../lib/pokedex";
 import { 
   ArrowLeft, 
   Plus, 
@@ -92,6 +93,7 @@ export default function AdminPage() {
   const [pokemonSearch, setPokemonSearch] = useState("");
   const [pokemonResults, setPokemonResults] = useState([]);
   const [searchingPokemon, setSearchingPokemon] = useState(false);
+  const pokemonSearchRequest = useRef(0);
   
   const [loginForm, setLoginForm] = useState({
     email: "",
@@ -307,27 +309,26 @@ export default function AdminPage() {
 
   const searchPokemon = async (query) => {
     setPokemonSearch(query);
+    const request = ++pokemonSearchRequest.current;
     if (query.length < 2) {
       setPokemonResults([]);
+      setSearchingPokemon(false);
       return;
     }
     
     setSearchingPokemon(true);
     try {
-      // Search Pokemon from PokeAPI
-      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon?limit=1025`);
-      const filtered = response.data.results
-        .filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
-        .slice(0, 10)
-        .map((p, index) => {
-          const id = parseInt(p.url.split('/').filter(Boolean).pop());
-          return { id, name: p.name };
-        });
-      setPokemonResults(filtered);
+      const catalog = await loadPokedex();
+      if (request !== pokemonSearchRequest.current) return;
+      const term = query.trim().toLocaleLowerCase("it");
+      setPokemonResults(catalog.filter(p =>
+        p.name.toLocaleLowerCase("it").includes(term)
+        || getPokemonDisplayName(p.name).toLocaleLowerCase("it").includes(term)
+      ).slice(0, 40));
     } catch (error) {
       console.error("Error searching pokemon:", error);
     } finally {
-      setSearchingPokemon(false);
+      if (request === pokemonSearchRequest.current) setSearchingPokemon(false);
     }
   };
 
@@ -337,11 +338,11 @@ export default function AdminPage() {
     try {
       await api.post(`/admin/users/${selectedUser.id}/pokemon`, {
         pokemon_id: pokemon.id,
-        pokemon_name: pokemon.name
+        pokemon_name: getPokemonDisplayName(pokemon.name)
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success(`${pokemon.name} assegnato a ${selectedUser.username}!`);
+      toast.success(`${getPokemonDisplayName(pokemon.name)} assegnato a ${selectedUser.username}!`);
       setPokemonSearch("");
       setPokemonResults([]);
       
@@ -879,8 +880,9 @@ export default function AdminPage() {
                       </div>
 
                       {/* Search Results */}
+                      {searchingPokemon && <p className="mt-2 text-sm text-gray-500">Caricamento catalogo Pokémon...</p>}
                       {pokemonResults.length > 0 && (
-                        <div className="mt-2 border border-[#D4AF37] rounded-lg overflow-hidden">
+                        <div className="mt-2 max-h-80 overflow-y-auto border border-[#D4AF37] rounded-lg">
                           {pokemonResults.map((p) => (
                             <button
                               key={p.id}
@@ -890,11 +892,11 @@ export default function AdminPage() {
                             >
                               <img
                                 src={getPokemonSprite(p.id)}
-                                alt={p.name}
+                                alt={getPokemonDisplayName(p.name)}
                                 className="w-10 h-10"
                               />
                               <div className="text-left">
-                                <p className="font-lato text-[#2C3E50] capitalize">{p.name}</p>
+                                <p className="font-lato text-[#2C3E50]">{getPokemonDisplayName(p.name)}</p>
                                 <p className="font-courier text-xs text-gray-400">#{p.id.toString().padStart(3, '0')}</p>
                               </div>
                               <Plus className="w-5 h-5 text-[#8E44AD] ml-auto" />
